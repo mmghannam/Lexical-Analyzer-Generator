@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# test files
+test-files/
+
 # Distribution / packaging
 .Python
 env/
@@ -89,3 +92,4 @@ ENV/
 .ropeproject
 
 .idea
+/test-files/test_grammar.txt
