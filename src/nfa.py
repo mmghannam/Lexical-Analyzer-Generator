@@ -12,7 +12,7 @@ class NFA:
     def __init__(self):
         self.start_node = None
         self.end_node = None
-        self.graph = Graph()
+        self.graph = DiGraph()
 
     def parse_tokens(self, tokens):
         """
@@ -35,39 +35,43 @@ class NFA:
                     else:
                         pass
 
-    def get_node_index(self):
+    @staticmethod
+    def get_node_index():
         NFA.cni += 1
         return NFA.cni - 1
+
+    @staticmethod
+    def from_regex(regex):
+        import re
+        simple_regex = re.compile(r'(.-.|.)+?')
+        matches = simple_regex.findall(regex)
+        nfa = NFA()
+        if len(matches) > 0:
+            nfa.from_simple_regex(matches[0])
+            for match in matches[1:]:
+                nfa.concatenate(NFA().from_simple_regex(match))
+            return nfa
+        else:
+            return None
 
     def from_simple_regex(self, regex):
         """"
         This method create an NFA from a simple regex without union,
          concatenation or kleene closure operations
+         examples : 'a' , 'a-c'
         """
         # TODO : Add Doctests
-
-        last_char = None
-        for i in range(len(regex)):
-            char = regex[i]
-            if is_letter(char):
-                last_char = char
-                # check if this char is not the start or the end of a range
-                if (i == len(regex) - 1 and regex[i - 1] != '-') or (i + 1 < len(regex) and regex[i + 1] != '-'):
-                    self.concatenate_node(char)
-            elif char == '-' and last_char is not None:
-                start_char = last_char
-                end_char = regex[i + 1 if i + 1 < len(regex) else None]
-                if end_char:
-                    self.add_nodes_in_range(start_char, end_char)
-                else:
-                    raise ValueError("""
-                                    "a-" is not a valid Regex format.
-                                     End range must be specified
-                                     """)
+        if '-' in regex:
+            start_char, _, end_char = regex
+            if start_char < end_char:
+                self.add_nodes_in_range(start_char, end_char)
             else:
-                raise ValueError('Error in Regex format')
+                raise ValueError('Error in Regex format, range start must be less than range end.')
+        else:
+            self.concatenate_node(regex)
         if not self.end_node:
             self.end_node = NFA.cni - 1
+        return self
 
     def concatenate_node(self, edge_weight):
         if not self.start_node:
@@ -75,9 +79,11 @@ class NFA:
         self.graph.add_weighted_edges_from([(NFA.cni - 1, self.get_node_index(), ord(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
-        # create start and end nodes
+        # create start node
         self.start_node = self.get_node_index()
+        # create end_node
         self.end_node = self.get_node_index()
+
         for char_ord in range(ord(start_char), ord(end_char) + 1):
             # connect starting node to first node before character
             self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), 0)])
@@ -91,8 +97,8 @@ class NFA:
         self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, 0)])
         # add the second graph edges to self.graph
         self.graph = nx.compose(self.graph, nfa.graph)
-
-        self.merge_nodes([self.end_node], nfa.start_node)
+        # update new end node with the second nfa's end node
+        self.end_node = nfa.end_node
 
     def union(self, nfa):
         last_start_node = self.start_node
@@ -113,7 +119,7 @@ class NFA:
 
     def draw(self):
         el = get_edge_attributes(self.graph, 'weight')
-        pos = shell_layout(self.graph, scale=2)
+        pos = circular_layout(self.graph, scale=2)
         draw_networkx(self.graph, pos)
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
         plt.show()
