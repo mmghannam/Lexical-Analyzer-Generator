@@ -7,7 +7,7 @@ from src.helpers import *
 class NFA:
     # current node index is kept as a static variable to ensure that
     # no two node are given the same index
-    __cni = 1
+    cni = 1
 
     def __init__(self):
         self.start_node = None
@@ -36,8 +36,8 @@ class NFA:
                         pass
 
     def get_node_index(self):
-        self.__cni += 1
-        return self.__cni - 1
+        NFA.cni += 1
+        return NFA.cni - 1
 
     def from_simple_regex(self, regex):
         """"
@@ -66,10 +66,13 @@ class NFA:
                                      """)
             else:
                 raise ValueError('Error in Regex format')
+        if not self.end_node:
+            self.end_node = NFA.cni - 1
 
     def concatenate_node(self, edge_weight):
-        self.graph.add_node(self.get_node_index())
-        self.graph.add_weighted_edges_from([(self.__cni - 2, self.__cni - 1, ord(edge_weight))])
+        if not self.start_node:
+            self.start_node = self.get_node_index()
+        self.graph.add_weighted_edges_from([(NFA.cni - 1, self.get_node_index(), ord(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
         # create start and end nodes
@@ -79,19 +82,19 @@ class NFA:
             # connect starting node to first node before character
             self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), 0)])
             # connect first node before character to the node after character
-            self.graph.add_weighted_edges_from([(self.__cni - 1, self.get_node_index(), char_ord)])
+            self.graph.add_weighted_edges_from([(NFA.cni - 1, self.get_node_index(), char_ord)])
             # connect node after character with end node
-            self.graph.add_weighted_edges_from([(self.__cni - 1, self.end_node, 0)])
+            self.graph.add_weighted_edges_from([(NFA.cni - 1, self.end_node, 0)])
 
     def concatenate(self, nfa):
-        # TODO : test
         # connect the end of the first graph with the start of the second
-        self.graph.add_weighted_edges_from(self.end_node, nfa.start_node, 0)
+        self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, 0)])
         # add the second graph edges to self.graph
         self.graph = nx.compose(self.graph, nfa.graph)
 
+        self.merge_nodes([self.end_node], nfa.start_node)
+
     def union(self, nfa):
-        # TODO : test
         last_start_node = self.start_node
         last_end_node = self.end_node
         self.start_node = self.get_node_index()
@@ -114,3 +117,21 @@ class NFA:
         draw_networkx(self.graph, pos)
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
         plt.show()
+
+    def merge_nodes(self, nodes, new_node):
+        """
+        Merges selected `nodes` of self.graph into a new_node
+        """
+
+        self.graph.add_node(new_node)  # Add the 'merged' node
+
+        for n1, n2, data in self.graph.edges(data=True):
+            # For all edges related to one of the nodes to merge,
+            # make an edge going to or coming from the `new gene`.
+            if n1 in nodes:
+                self.graph.add_edge(new_node, n2, data)
+            elif n2 in nodes:
+                self.graph.add_edge(n1, new_node, data)
+
+        for n in nodes:  # remove the merged nodes
+            self.graph.remove_node(n)
