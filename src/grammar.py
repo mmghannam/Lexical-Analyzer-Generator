@@ -1,53 +1,137 @@
 import pathlib
-import unittest
+# import unittest
 import os
+import re
+import pprint as pp
+import src.regex_expander as regexex
+from enum import Enum
+
+
+class TokenType(Enum):
+    letter = 0
+    digit = 1
+    identifier = 2  # if else while
+    digits = 3
+    type = 4  # boolean int float
+    num = 5
+    rel_op = 6
+    assignment_op = 7
+    reserved_word = 8
+    punctuation = 9
+    add_op = 10
+    mul_op = 11
+    labmda = 12
 
 
 class Grammar:
-    def __init__(self, path):
-        self.tokens = []
-        self.__file_contents = pathlib.Path(path).read_text().split('\n')
+    non_terminals = {
+        'id': 'letter(letter | digit) *',
+        'num': 'digit+ | digit+ . digits ( \L | E digits)',
+        'relop': "\=\= | !\= | > | >\= | < | <\=".replace(' ', ''),
+        'addop': '\+ | -'.replace(' ', ''),
+        'mulop': '\* | /'.replace(' ', ''),
+        'assign': '=',
 
-    def pre_process(self):
-        # TODO:
-        # open file
-        # initialize tokens list
-        # add each token to list in the form of a tuple ( REGEX, token_name )
-        # return Grammar(tokens)
-        for line in self.__file_contents:
-            (prod_name, pattern) = self.expand_pattern(line)
+    }
+    terminals = {
+        'letter': 'a-z',
+        'digit': '0-9',
+        'L': '@',
+        'E': 'exp',
+        'digits': 'digit+'
+    }
 
-        return 1
+    def __init__(self, path=None):
+        self.classes = []
 
-    def expand_pattern(self, line):
-        words = line.split(' ')
+        self.letters = regexex.generate_range('a', 'z')
+        self.numbers = regexex.generate_range('0', '9')
 
-        if len(words) < 3:
-            raise RuntimeError('Line doesnt have enough arguments')
+        self.classes.append((TokenType.letter, self.letters))
+        self.classes.append((TokenType.digit, self.numbers))
+        self.classes.append((TokenType.reserved_word, ['if', 'else', 'while']))
+        self.classes.append((TokenType.type, ['boolean', 'int', 'float']))
+        self.classes.append((TokenType.rel_op, ['==', '!=', '>', '>=', '<', '<=']))
+        self.classes.append((TokenType.assignment_op, ['=']))
+        self.classes.append((TokenType.add_op, ['+', '-']))
 
-        assignment_op = words[1]
+        # for file parsing, check if a line starts with [,{
+        keywords = '{if else while}'
+        types = '{boolean int float}'
 
-        if assignment_op == '=':
-            pass  # TODO define new char class
+        punct = '[; , \( \) { }]'
+        self.add_as_reserved(punct, self.non_terminals)
 
-        if assignment_op == ':':
-            pass  # TODO expand a regex
+        self.add_as_reserved(keywords, self.non_terminals)
+        self.add_as_reserved(types, self.non_terminals)
 
-        self.tokens.append([]);
+        self.flatten_dict_definitions()
+
+    def flatten_dict_definitions(self):
+        for prod_k, prod_v in self.non_terminals.items():
+
+            # Replace nested productions
+            for included_prod_name, in_prod_val in self.non_terminals.items():
+
+                if included_prod_name in prod_v:  # need to find the longest match
+                    self.non_terminals[prod_k] = prod_v = prod_v.replace(in_prod_val, prod_v)
+
+            # Replace terminals
+            for terminal, sequence in self.terminals.items():
+                if terminal in prod_v:  # need to find the longest match
+                    print("prod-name:", prod_k, ", prod", prod_v,
+                          ", terminal", terminal, ", expansion", sequence)
+                    print("result", prod_v.replace(terminal, sequence))
+                    self.non_terminals[prod_k] = prod_v = prod_v.replace(terminal, sequence)
+                    # self.non_terminals[prod_name] =
+                    print()
+
+    def add_as_reserved(self, char_def, grammar_dict):
+        # Expand definitions to key-value pairs
+        expanded_def = self.ultimate_expander(char_def)
+        # Add updates to the main dictionary
+        self.__expand_dictionary(grammar_dict, expanded_def)
+
+    @staticmethod
+    def __expand_dictionary(dictionary, key_value_list):
+        [dictionary.update(kv) for kv in key_value_list]
+
+    @staticmethod
+    def ultimate_expander(rule: str):
+        """
+        Cleans up a line which contains a definition, then maps each item to itself
+        :param rule: rule definition e.x '{if else}' -> {'if':'if'} , {'else':'else'}
+        :return: list of key:value pairs
+        """
+        rule = rule.strip()
+        tokens = rule.replace(rule[0], '').replace(rule[-1], '')
+
+        token_list = tokens.split(' ')
+
+        return [{t: t.replace('\\', '')} for t in token_list]
 
 
 """
 Tests
 """
 
+# class TestStringMethods(unittest.TestCase):
+#     pass
 
-class TestStringMethods(unittest.TestCase):
-    def test_open_file(self):
-        tests_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test-files'))
-        grammar = Grammar(tests_path + '/test_grammar.txt')
-        self.assertEqual(grammar.pre_process(), 1)
-        print("file:", __file__)
+
+# def test_open_file(self):
+#     tests_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test-files'))
+#     grammar = Grammar(tests_path + '/test_grammar.txt')
+#     self.assertEqual(grammar.pre_process(), 1)
+#     print("file:", __file__)
+#
+# def test_expand_pattern(self):
+#     gra = Grammar()
+#     gra.expand_pattern('ch=a-b')
+#     self.assertEqual(set(gra.expand_pattern('x = a-b|1-3')[1]), {'a', 'b', '1', '2', '3'})
 
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    g = Grammar()
+    pp.pprint(g.non_terminals)

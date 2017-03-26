@@ -5,7 +5,7 @@ import re
 import unittest
 
 
-def expand_regex(regex):
+def expand_regex(regex) -> (str, []):
     return __solve_one(r"\d-\d", regex) or __solve_one(r"\w-\w", regex)
 
 
