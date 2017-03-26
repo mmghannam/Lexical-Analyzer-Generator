@@ -69,10 +69,12 @@ class Grammar:
     def flatten_dict_definitions(self):
 
         for prod_k, prod_v in self.non_terminals.items():
-            # Replace terminals
+
+            # Replace terminals in other terminals, TODO recursively parse it
             for terminal, sequence in self.terminals.items():
                 self.non_terminals[prod_k] = prod_v = re.sub('(' + terminal + '(?!\w))', sequence, prod_v)
 
+            # Replace non terminals
             for non_term, seq in self.non_terminals.items():
                 self.non_terminals[prod_k] = prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
 
