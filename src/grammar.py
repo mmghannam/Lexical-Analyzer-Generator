@@ -31,14 +31,13 @@ class Grammar:
         'addop': '\+ | -'.replace(' ', ''),
         'mulop': '\* | /'.replace(' ', ''),
         'assign': '=',
-
+        'digits': 'digit+'
     }
     terminals = {
         'letter': 'a-z',
         'digit': '0-9',
         'L': '@',
         'E': 'exp',
-        'digits': 'digit+'
     }
 
     def __init__(self, path=None):
@@ -68,23 +67,14 @@ class Grammar:
         self.flatten_dict_definitions()
 
     def flatten_dict_definitions(self):
+
         for prod_k, prod_v in self.non_terminals.items():
-
-            # Replace nested productions
-            for included_prod_name, in_prod_val in self.non_terminals.items():
-
-                if included_prod_name in prod_v:  # need to find the longest match
-                    self.non_terminals[prod_k] = prod_v = prod_v.replace(in_prod_val, prod_v)
-
             # Replace terminals
             for terminal, sequence in self.terminals.items():
-                if terminal in prod_v:  # need to find the longest match
-                    print("prod-name:", prod_k, ", prod", prod_v,
-                          ", terminal", terminal, ", expansion", sequence)
-                    print("result", prod_v.replace(terminal, sequence))
-                    self.non_terminals[prod_k] = prod_v = prod_v.replace(terminal, sequence)
-                    # self.non_terminals[prod_name] =
-                    print()
+                self.non_terminals[prod_k] = prod_v = re.sub('(' + terminal + '(?!\w))', sequence, prod_v)
+
+            for non_term, seq in self.non_terminals.items():
+                self.non_terminals[prod_k] = prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
 
     def add_as_reserved(self, char_def, grammar_dict):
         # Expand definitions to key-value pairs
