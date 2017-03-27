@@ -12,8 +12,4 @@ nfa = NFA()
 
 nfa.from_simple_regex('a-c')
 
-for x, y in nfa:
-    print(x, y)
-    print('=' * 100)
-
 nfa.draw()
