@@ -12,7 +12,7 @@ class NFA:
     def __init__(self):
         self.start_node = None
         self.end_node = None
-        self.graph = Graph()
+        self.graph = DiGraph()
 
     def parse_tokens(self, tokens):
         """
@@ -114,3 +114,22 @@ class NFA:
         draw_networkx(self.graph, pos)
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
         plt.show()
+
+    def __iter__(self):
+        """
+        :return: an iterator each time it contains a node and a dictionary
+         the dictionary contains each neighbor and the cost to go to that neighbor
+
+         dictionary structure:
+            :key neighbor index
+            :value: weight on edge between source node and specified neighbor
+        """
+
+        for node in self.graph.nodes_iter():
+            neighbors = self.graph.neighbors(node)
+
+            neighbors_dict = dict()
+            for neighbor in neighbors:
+                neighbors_dict[neighbor] = self.graph.get_edge_data(node, neighbor)['weight']
+
+            yield node, neighbors_dict
