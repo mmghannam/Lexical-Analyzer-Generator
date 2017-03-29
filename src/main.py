@@ -1,12 +1,7 @@
-import doctest
-
-import matplotlib.pyplot as plt
-import networkx as nx
-
 from src.nfa import *
+from src.tokenizer import *
 
-# loading doctests
-doctest.testmod()
-
-nfa = NFA.from_regex('a-bc-d')
+nfa = NFA.from_tokens([Token('bac', 'bibo')])
+print('start: ', nfa.start_node)
+print('end: ', nfa.end_node)
 nfa.draw()
