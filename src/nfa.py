@@ -7,7 +7,7 @@ from src.helpers import *
 class NFA:
     # current node index is kept as a static variable to ensure that
     # no two node are given the same index
-    __cni = 1
+    __cni = 0
 
     def __init__(self):
         self.start_node = None
@@ -296,3 +296,43 @@ class NFA:
 
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
         plt.show()
+
+    def __iter__(self):
+        """
+        :return: an iterator each time it contains a node and a dictionary
+         the dictionary contains each neighbor and the cost to go to that neighbor
+
+         dictionary structure:
+            key: neighbor index
+            value: weight on edge between source node and specified neighbor
+        """
+
+        for node in self.graph.nodes_iter():
+            node_neighbors = self.graph.neighbors(node)
+
+            neighbors_dict = dict()
+            for neighbor in node_neighbors:
+                neighbors_dict[neighbor] = self.graph.get_edge_data(node, neighbor)['weight']
+
+            yield node, neighbors_dict
+
+    def epsilon_closure(self, node):
+        """
+        calculates the epsilon closures of a given state.
+        the epsilon closure is given by the set of states to which transitioning
+        to them doesn't have a cost
+
+        :param node: any given node in the NFA
+        :return: immutable set of epsilon closures
+        """
+
+        epsilon_closure = set(node)
+
+        node_neighbors = self.graph.neighbors(node)
+        for neighbor in node_neighbors:
+            weight = self.graph.get_edge_data(node, neighbor)['weight']
+
+            if weight == 0:
+                epsilon_closure.add(neighbor)
+
+        return frozenset(epsilon_closure)
