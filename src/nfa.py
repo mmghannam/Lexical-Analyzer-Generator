@@ -144,7 +144,7 @@ class NFA:
         :return: immutable set of epsilon closures
         """
 
-        epsilon_closure = set()
+        epsilon_closure = set(node)
 
         node_neighbors = self.graph.neighbors(node)
         for neighbor in node_neighbors:
