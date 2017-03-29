@@ -89,30 +89,9 @@ class NFA:
                     # perform all operations in stack to be able to push the lower priority operator
                     operator = operators.pop()
                     while operator and priority[current_char] < priority[operator]:
-                        if operator == '&':
-                            if result_nfa:
-                                # create an nfa of only one operand as the result_nfa represents the second operand
-                                operand_nfa = NFA.from_simple_regex(operands.pop())
-                                # concatenate result_nfa to operand
-                                result_nfa = operand_nfa.concatenate(result_nfa)
-                            # if result_nfa hasn't been initialized
-                            else:
-                                # pop two operands
-                                second_operand = operands.pop()
-                                first_operand = operands.pop()
-                                # create an nfa of their concatenation
-                                result_nfa = NFA.from_simple_regex(first_operand + second_operand)
-                        elif operator == '|':
-                            if result_nfa:
-                                # create an nfa of only one operand as the result_nfa represents the second operand
-                                result_nfa.union(NFA.from_simple_regex(operands.pop()))
-                            else:
-                                # pop two operands and create corresponding NFA's
-                                second_operand_nfa = NFA.from_simple_regex(operands.pop())
-                                first_operand_nfa = NFA.from_simple_regex(operands.pop())
-                                # create a union of the two NFA's
-                                result_nfa = first_operand_nfa.union(second_operand_nfa)
-
+                        # evaluate the operation
+                        result_nfa = NFA.evaluate_operation(result_nfa, operator, operands)
+                        # remove the handled operation from stack
                         operator = operators.pop()
                     # push the lower priority operator
                     operators.push(current_char)
@@ -120,26 +99,11 @@ class NFA:
             else:
                 operators.push(current_char)
             i += 1
-
         # perform the remaining operations
         while not operators.empty():
             operator = operators.pop()
-            if operator == '&':
-                if result_nfa:
-                    operand_nfa = NFA.from_simple_regex(operands.pop())
-                    result_nfa = operand_nfa.concatenate(result_nfa)
-                else:
-                    second_operand = operands.pop()
-                    first_operand = operands.pop()
-                    result_nfa = NFA.from_simple_regex(first_operand + second_operand)
-            elif operator == '|':
-                if result_nfa:
-                    result_nfa.union(NFA.from_simple_regex(operands.pop()))
-                else:
-                    second_operand_nfa = NFA.from_simple_regex(operands.pop())
-                    first_operand_nfa = NFA.from_simple_regex(operands.pop())
-                    result_nfa = first_operand_nfa.union(second_operand_nfa)
-
+            # evaluate the operation
+            result_nfa = NFA.evaluate_operation(result_nfa, operator, operands)
         # in case of one-character regex
         if not result_nfa and not operands.empty():
             result_nfa = NFA.from_simple_regex(operands.pop())
@@ -147,6 +111,34 @@ class NFA:
         if kleene_closure:
             result_nfa.kleene_closure()
         return result_nfa
+
+    @staticmethod
+    def evaluate_operation(nfa, operator, operands):
+        if operator == '&':
+            if nfa:
+                # create an nfa of only one operand as the result_nfa represents the second operand
+                operand_nfa = NFA.from_simple_regex(operands.pop())
+                # concatenate result_nfa to operand
+                nfa = operand_nfa.concatenate(nfa)
+            # if result_nfa hasn't been initialized
+            else:
+                # pop two operands
+                second_operand = operands.pop()
+                first_operand = operands.pop()
+                # create an nfa of their concatenation
+                nfa = NFA.from_simple_regex(first_operand + second_operand)
+        elif operator == '|':
+            if nfa:
+                # create an nfa of only one operand as the result_nfa represents the second operand
+                nfa.union(NFA.from_simple_regex(operands.pop()))
+            else:
+                # pop two operands and create corresponding NFA's
+                second_operand_nfa = NFA.from_simple_regex(operands.pop())
+                first_operand_nfa = NFA.from_simple_regex(operands.pop())
+                # create a union of the two NFA's
+                nfa = first_operand_nfa.union(second_operand_nfa)
+
+        return nfa
 
     @staticmethod
     def get_node_index():
