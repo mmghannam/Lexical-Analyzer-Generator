@@ -1,4 +1,3 @@
 # Dependencies
 networkx
 matplotlib
-src
