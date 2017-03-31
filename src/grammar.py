@@ -5,6 +5,7 @@ import re
 import pprint as pp
 import src.regex_expander as regexex
 from enum import Enum
+from src.tokenizer import Token
 
 
 class TokenType(Enum):
@@ -102,6 +103,11 @@ class Grammar:
 
         return [{t: t.replace('\\', '')} for t in token_list]
 
+    def get_token_list(self):
+        tokens = []
+        for k, v in g.non_terminals.items():
+            tokens.append(Token(v.replace(' ', ''), k))
+        return tokens
 
 """
 Tests
