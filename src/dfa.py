@@ -18,13 +18,11 @@ class DFA:
         self.generate_dfa(nfa)
 
     def generate_dfa(self, nfa):
-        self.start_node = nfa.start_node
-
         self.states = list()
         worklist = list()
 
         start_state = DFAState(self.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False)
-        # print(start_state)
+        self.increment_node_index()
 
         self.states.append(start_state)
         worklist.append(start_state)
