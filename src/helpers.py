@@ -1,11 +1,11 @@
 def is_letter(char):
     """
     Checks whether a certain char is a letter
-    >>> is_letter('B')
+    >> is_letter('B')
     True
-    >>> is_letter('b')
+    >> is_letter('b')
     True
-    >>> is_letter('#')
+    >> is_letter('#')
     False
     """
     return 'A' <= char <= 'z'
@@ -16,9 +16,9 @@ def string_to_priority_hash(string):
     Returns a priority hash from a string with the highest priority given
      to the first character and the lowest given to the last character
 
-    >>> string_to_priority_hash('ab')['a']
+    >> string_to_priority_hash('ab')['a']
     2
-    >>> string_to_priority_hash('ab')['b']
+    >> string_to_priority_hash('ab')['b']
     1
     """
     priority_hash = {}
@@ -56,11 +56,11 @@ def add_concatenation_operator_to_regex(regex):
     """
     This function adds '&' character for explicit concatenation
 
-    >>> add_concatenation_operator_to_regex('abc')
+    >> add_concatenation_operator_to_regex('abc')
     'a&b&c'
-    >>> add_concatenation_operator_to_regex('a|b|c')
+    >> add_concatenation_operator_to_regex('a|b|c')
     'a|b|c'
-    >>> add_concatenation_operator_to_regex('a(bc)*')
+    >> add_concatenation_operator_to_regex('a(bc)*')
     'a&(b&c)*'
     """
     chars = []
@@ -77,7 +77,7 @@ def add_concatenation_operator_to_regex(regex):
     # handle last character
     if next_char == ')' or (current_char == ')' and next_char == '*') or \
             (current_char not in '()*+' and next_char not in '()*+|') or current_char == '\\' or \
-            current_char == '*' and next_char not in '()|*':
+                            current_char == '*' and next_char not in '()|*':
         chars.append(next_char)
     else:
         chars += ['&', next_char]

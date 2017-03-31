@@ -1,5 +1,6 @@
-from networkx import *
 import matplotlib.pyplot as plt
+from networkx import *
+
 from src.helpers import *
 
 
@@ -347,8 +348,8 @@ class NFA:
     def check_acceptance(self, nodes):
         for node in nodes:
             if self.is_acceptance_node(node):
-                return True
-        return False
+                return True, self.get_token_name_from_acceptance_node(node)
+        return False, None
 
     def get_acceptance_states(self):
         print('=' * 100, '\nnfa acceptance states:')

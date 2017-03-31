@@ -1,10 +1,9 @@
-import pathlib
 # import unittest
-import os
-import re
 import pprint as pp
-import src.regex_expander as regexex
+import re
 from enum import Enum
+
+import src.regex_expander as regexex
 
 
 class TokenType(Enum):
@@ -33,6 +32,7 @@ class Grammar:
         'assign': '=',
         'digits': 'digit+'
     }
+
     terminals = {
         'letter': 'a-z',
         'digit': '0-9',
