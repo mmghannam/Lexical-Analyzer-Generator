@@ -105,7 +105,7 @@ class Grammar:
 
     def get_token_list(self):
         tokens = []
-        for k, v in g.non_terminals.items():
+        for k, v in self.non_terminals.items():
             tokens.append(Token(v.replace(' ', ''), k))
         return tokens
 
