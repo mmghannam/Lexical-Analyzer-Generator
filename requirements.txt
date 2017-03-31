@@ -1,4 +1,4 @@
 # Dependencies
 networkx
 matplotlib
-src
+prettytable

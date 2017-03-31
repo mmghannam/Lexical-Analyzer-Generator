@@ -1,3 +1,4 @@
+from checkbox_support.lib import input
 from networkx import *
 import matplotlib.pyplot as plt
 
@@ -7,7 +8,7 @@ from src.helpers import *
 class NFA:
     # current node index is kept as a static variable to ensure that
     # no two node are given the same index
-    __cni = 0
+    __cni = 1
 
     def __init__(self):
         self.start_node = None
@@ -316,7 +317,7 @@ class NFA:
 
             yield node, neighbors_dict
 
-    def epsilon_closure(self, node):
+    def __epsilon_closure(self, node):
         """
         calculates the epsilon closures of a given state.
         the epsilon closure is given by the set of states to which transitioning
@@ -326,7 +327,7 @@ class NFA:
         :return: immutable set of epsilon closures
         """
 
-        epsilon_closure = set(node)
+        epsilon_closure = {node}
 
         node_neighbors = self.graph.neighbors(node)
         for neighbor in node_neighbors:
@@ -335,4 +336,37 @@ class NFA:
             if weight == 0:
                 epsilon_closure.add(neighbor)
 
-        return frozenset(epsilon_closure)
+        return epsilon_closure
+
+    def get_epsilon_closures(self, nodes):
+        nodes = {nodes} if not isinstance(nodes, set) else nodes
+        epsilon_closures = set()
+
+        for node in nodes:
+            for epsilon_node in self.__epsilon_closure(node):
+                if epsilon_node not in nodes:
+                    epsilon_closures.add(epsilon_node)
+
+        if not epsilon_closures:
+            return nodes
+
+        nodes.update(epsilon_closures)
+        return self.get_epsilon_closures(nodes)
+
+    def move(self, nodes, input):
+        destination = set()
+
+        nodes = {nodes} if not isinstance(nodes, set) else nodes
+        nodes.update(self.get_epsilon_closures(nodes))
+        inputs = {input} if not isinstance(input, set) else input
+
+        for node in nodes:
+            for edge in self.graph.edges_iter(node, True):
+                from_node, to_node, weight = edge
+                weight = weight['weight']
+
+                for input in inputs:
+                    if weight == ord(str(input)):
+                        destination.add(to_node)
+
+        return destination
