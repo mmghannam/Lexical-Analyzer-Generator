@@ -23,32 +23,50 @@ class DFA:
         self.states = list()
         worklist = list()
 
-        start_state = DFAState(self.get_node_index(), nfa.get_epsilon_closures(nfa.start_node))
+        start_state = DFAState(self.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False)
         # print(start_state)
 
         self.states.append(start_state)
         worklist.append(start_state)
 
+        # worklist is a list that contains any new DFA state generated
         while worklist:
             current_state = worklist.pop()
             self.transition_table[current_state.index] = OrderedDict()
 
+            # for every input
             for input_literal in self.input_list:
+                # get new state by moving under input
                 new_nfa_states = nfa.get_epsilon_closures(nfa.move(current_state.NFAStates, input_literal))
 
+                # not going anywhere
                 if not new_nfa_states:  # rejection
-                    new_dfa_state = DFAState(-1, set())
-                else:
-                    new_state_index = self.get_node_index()
-                    new_dfa_state = DFAState(new_state_index, new_nfa_states)
+                    self.transition_table[current_state.index][input_literal] = None
+                    continue
 
-                self.transition_table[current_state.index][input_literal] = new_dfa_state.index
+                is_acceptance = nfa.check_acceptance(new_nfa_states)
+                new_dfa_state = DFAState(self.get_node_index(), new_nfa_states, is_acceptance)
 
-                if new_dfa_state not in self.states:
+                # check if state already exists
+                state_exists, index = self.state_exists(new_dfa_state)
+
+                if not state_exists:  # new state
                     self.states.append(new_dfa_state)
                     worklist.append(new_dfa_state)
 
+                    self.transition_table[current_state.index][input_literal] = index
+                    self.increment_node_index()
+                else: # already exists, don't add to worklist
+                    self.transition_table[current_state.index][input_literal] = index
+
         self.print_transition_table()
+
+    def state_exists(self, new_state):
+        for state in self.states:
+            if new_state.NFAStates == state.NFAStates:
+                return True, state.index
+
+        return False, new_state.index
 
     def is_letter(self, char):
         return (ord('a') <= ord(char) <= ord('z')) or \
@@ -59,12 +77,10 @@ class DFA:
             else (0 <= num <= 9)
 
     def get_node_index(self):
-        """
-        This method keeps track of the index of nodes and returns a different index each time by incrementing the static
-        class variable __cni
-        """
+        return self.node_index
+
+    def increment_node_index(self):
         self.node_index += 1
-        return self.node_index - 1
 
     def print_transition_table(self):
 
@@ -93,5 +109,4 @@ class DFA:
         ]
 
         # self.input_list = letters + digits + operators
-        self.input_list = 'abcd'
-
+        self.input_list = '01'

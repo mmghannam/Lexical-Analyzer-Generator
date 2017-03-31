@@ -1,6 +1,5 @@
 from networkx import *
 import matplotlib.pyplot as plt
-
 from src.helpers import *
 
 
@@ -342,4 +341,18 @@ class NFA:
                     if weight == ord(str(input)):
                         destination.add(to_node)
 
+        destination.update(self.get_epsilon_closures(destination))
         return destination
+
+    def check_acceptance(self, nodes):
+        for node in nodes:
+            if self.is_acceptance_node(node):
+                return True
+        return False
+
+    def get_acceptance_states(self):
+        print('=' * 100, '\nnfa acceptance states:')
+        for node in self.graph.nodes_iter():
+            if self.is_acceptance_node(node):
+                print(node)
+        print('=' * 100)
