@@ -2,9 +2,9 @@
 import pprint as pp
 import re
 from enum import Enum
-from src.tokenizer import Token
 
 import src.regex_expander as regexex
+from src.tokenizer import Token
 
 
 class TokenType(Enum):
@@ -108,6 +108,7 @@ class Grammar:
         for k, v in self.non_terminals.items():
             tokens.append(Token(v.replace(' ', ''), k))
         return tokens
+
 
 """
 Tests
