@@ -76,7 +76,8 @@ def add_concatenation_operator_to_regex(regex):
             chars.append(current_char)
     # handle last character
     if next_char == ')' or (current_char == ')' and next_char == '*') or \
-            (current_char not in '()*+' and next_char not in '()*+|') or current_char == '\\':
+            (current_char not in '()*+' and next_char not in '()*+|') or current_char == '\\' or \
+            current_char == '*' and next_char not in '()|*':
         chars.append(next_char)
     else:
         chars += ['&', next_char]

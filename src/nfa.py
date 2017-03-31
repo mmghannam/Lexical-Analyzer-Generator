@@ -1,4 +1,3 @@
-from checkbox_support.lib import input
 from networkx import *
 import matplotlib.pyplot as plt
 
@@ -31,14 +30,13 @@ class NFA:
             raise ValueError('Tokens list can\'t be empty')
 
     @staticmethod
-    def from_regex(regex, kleene_closure=False):
+    def from_regex(regex):
         """
         This method implements a shunting-yard-like algorithm to parse each token's regex
         """
-        priority = string_to_priority_hash('*&|')
+        priority = string_to_priority_hash('(*&|)')
         operands = Stack()
         operators = Stack()
-        result_nfa = None
         i = 0
         while i < len(regex):
             # keep track of the current char
@@ -49,38 +47,26 @@ class NFA:
                 # loops till the end of the expression
                 while regex[i] != ')':
                     i += 1
-                # avoiding out of range error
-                if i + 1 < len(regex):
-                    # checking for kleene closure expression
-                    if regex[i + 1] == '*':
-                        result_nfa = NFA.from_regex(regex[current_i + 1:i],
-                                                    kleene_closure=True)
-                        i += 1
-                    else:
-                        result_nfa = NFA.from_regex(regex[current_i + 1:i],
-                                                    kleene_closure=False)
-                # in case the regex ends in ')'
-                else:
-                    result_nfa = NFA.from_regex(regex[current_i + 1:i],
-                                                kleene_closure=False)
+
+                operands.push(NFA.from_regex(regex[current_i + 1:i]))
             # bypass the end of expression character
             elif current_char == ')':
                 pass
             # in case of an escaped special character like '\*'
             elif i < len(regex) - 1 and current_char == '\\':
-                operands.push(regex[i + 1])
+                operands.push(NFA.from_simple_regex(regex[i + 1]))
                 # skip the next char
                 i += 1
             # checks for operands
             elif current_char not in '*&|':
                 # checks for existence of a range in form 'a-c' which is equivalent to 'a|b|c'
                 if i < len(regex) - 2 and regex[i + 1] == '-' and regex[i + 2]:
-                    operands.push(regex[i:i + 3])
+                    operands.push(NFA.from_simple_regex(regex[i:i + 3]))
                     i += 3
                     continue
                 # in case of a normal operand, examples: 'a','t'
                 else:
-                    operands.push(current_char)
+                    operands.push(NFA.from_simple_regex(current_char))
             # if there are any operators
             elif not operators.empty():
                 # only higher priority operators can be pushed to stack ( from shunting-yard algorithm)
@@ -90,8 +76,8 @@ class NFA:
                     # perform all operations in stack to be able to push the lower priority operator
                     operator = operators.pop()
                     while operator and priority[current_char] < priority[operator]:
-                        # evaluate the operation
-                        result_nfa = NFA.evaluate_operation(result_nfa, operator, operands)
+                        # evaluate the operation ( result is push back to operands stack )
+                        NFA.evaluate_operation(operator, operands)
                         # remove the handled operation from stack
                         operator = operators.pop()
                     # push the lower priority operator
@@ -104,42 +90,26 @@ class NFA:
         while not operators.empty():
             operator = operators.pop()
             # evaluate the operation
-            result_nfa = NFA.evaluate_operation(result_nfa, operator, operands)
-        # in case of one-character regex
-        if not result_nfa and not operands.empty():
-            result_nfa = NFA.from_simple_regex(operands.pop())
-        # add kleene_closure
-        if kleene_closure:
-            result_nfa.kleene_closure()
-        return result_nfa
+            NFA.evaluate_operation(operator, operands)
+
+        return operands.pop()
 
     @staticmethod
-    def evaluate_operation(nfa, operator, operands):
+    def evaluate_operation(operator, operands):
         if operator == '&':
-            if nfa:
-                # create an nfa of only one operand as the result_nfa represents the second operand
-                operand_nfa = NFA.from_simple_regex(operands.pop())
-                # concatenate result_nfa to operand
-                nfa = operand_nfa.concatenate(nfa)
-            # if result_nfa hasn't been initialized
-            else:
-                # pop two operands
-                second_operand = operands.pop()
-                first_operand = operands.pop()
-                # create an nfa of their concatenation
-                nfa = NFA.from_simple_regex(first_operand + second_operand)
+            # pop two operands
+            second_operand = operands.pop()
+            first_operand = operands.pop()
+            # create an nfa of their concatenation
+            operands.push(first_operand.concatenate(second_operand))
         elif operator == '|':
-            if nfa:
-                # create an nfa of only one operand as the result_nfa represents the second operand
-                nfa.union(NFA.from_simple_regex(operands.pop()))
-            else:
-                # pop two operands and create corresponding NFA's
-                second_operand_nfa = NFA.from_simple_regex(operands.pop())
-                first_operand_nfa = NFA.from_simple_regex(operands.pop())
-                # create a union of the two NFA's
-                nfa = first_operand_nfa.union(second_operand_nfa)
-
-        return nfa
+            # pop two operands and create corresponding NFA's
+            second_operand_nfa = operands.pop()
+            first_operand_nfa = operands.pop()
+            # create a union of the two NFA's
+            operands.push(first_operand_nfa.union(second_operand_nfa))
+        elif operator == '*':
+            operands.push(operands.pop().kleene_closure())
 
     @staticmethod
     def get_node_index():
@@ -188,9 +158,10 @@ class NFA:
         return self
 
     def concatenate_node(self, edge_weight):
-        if not self.start_node:
-            self.start_node = self.get_node_index()
-        self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.get_node_index(), ord(edge_weight))])
+        if not self.start_node and not self.end_node:
+            self.start_node = NFA.get_node_index()
+            self.end_node = NFA.get_node_index()
+            self.graph.add_weighted_edges_from([(self.start_node, self.end_node, ord(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
         # create start node
@@ -262,6 +233,8 @@ class NFA:
         self.graph.add_weighted_edges_from([(self.start_node, last_start_node, 0),
                                             (last_end_node, self.end_node, 0),
                                             (self.start_node, self.end_node, 0)])
+
+        return self
 
     def plus(self):
         # TODO : Implement in from_regex method

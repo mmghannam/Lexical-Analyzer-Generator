@@ -2,7 +2,7 @@ from src.nfa import *
 from src.dfa import *
 from src.tokenizer import *
 
-nfa = NFA.from_tokens([Token('(a|B)*a', 'bibo')])
+nfa = NFA.from_tokens([Token('a(a|b)*', 'bibo')])
 print('start: ', nfa.start_node)
 print('end: ', nfa.end_node)
 
