@@ -70,7 +70,7 @@ def add_concatenation_operator_to_regex(regex):
         current_char = regex[i]
         next_char = regex[i + 1]
 
-        if current_char not in '(*+|-\\' and next_char not in '|)*-':
+        if current_char not in '(+|-\\' and next_char not in '|)*-':
             chars += [current_char, '&']
         else:
             chars.append(current_char)
