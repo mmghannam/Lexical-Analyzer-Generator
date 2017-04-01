@@ -42,10 +42,13 @@ class Grammar:
     }
 
     def __init__(self, path=None):
-        self.classes = []
-
 
         # for file parsing, check if a line starts with [,{
+        lines = open('./test-files/test_grammar.txt').readlines()
+        r = re.compile(r'(.+)(:|=)(.+)')
+
+        r.findall(lines[0].strip())
+
         keywords = '{if else while}'
         types = '{boolean int float}'
 
@@ -60,14 +63,20 @@ class Grammar:
     def flatten_dict_definitions(self):
 
         for prod_k, prod_v in self.non_terminals.items():
+            # bfs_replace_terminals()
+            # Replace non terminals, TODO parse it till end
+            for non_term, seq in self.non_terminals.items():
+                while True:
+                    prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
+                    if temp is prod_v:
+                        self.non_terminals[prod_k] = prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
+                        break  # Input = Output
+                    else:
+                        temp = prod_v
 
-            # Replace terminals in other terminals, TODO recursively parse it
+                        # Replace terminals in other terminals
             for terminal, sequence in self.terminals.items():
                 self.non_terminals[prod_k] = prod_v = re.sub('(' + terminal + '(?!\w))', sequence, prod_v)
-
-            # Replace non terminals
-            for non_term, seq in self.non_terminals.items():
-                self.non_terminals[prod_k] = prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
 
     def add_as_reserved(self, char_def, grammar_dict):
         # Expand definitions to key-value pairs
