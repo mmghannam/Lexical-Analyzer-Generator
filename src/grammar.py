@@ -1,136 +1,158 @@
 # import unittest
-import pprint as pp
 import re
-from enum import Enum
-
-import src.regex_expander as regexex
-from src.tokenizer import Token
-
-
-class TokenType(Enum):
-    letter = 0
-    digit = 1
-    identifier = 2  # if else while
-    digits = 3
-    type = 4  # boolean int float
-    num = 5
-    rel_op = 6
-    assignment_op = 7
-    reserved_word = 8
-    punctuation = 9
-    add_op = 10
-    mul_op = 11
-    labmda = 12
+from src.grammar_token import GrammarToken
 
 
 class Grammar:
-    non_terminals = {
-        'id': 'letter(letter | digit) *',
-        'num': 'digit+ | digit+ . digits ( \L | E digits)',
-        'relop': "\=\= | !\= | > | >\= | < | <\=".replace(' ', ''),
-        'addop': '\+ | -'.replace(' ', ''),
-        'mulop': '\* | /'.replace(' ', ''),
-        'assign': '=',
-        'digits': 'digit+'
-    }
-
-    terminals = {
-        'letter': 'a-z',
-        'digit': '0-9',
-        'L': '@',
-        'E': 'exp',
-    }
-
     def __init__(self, path=None):
 
         # for file parsing, check if a line starts with [,{
-        lines = open('./test-files/test_grammar.txt').readlines()
-        r = re.compile(r'(.+)(:|=)(.+)')
 
-        r.findall(lines[0].strip())
+        self.path = path
+        self.__terminals = []
+        self.__non_terminals = []
 
-        keywords = '{if else while}'
-        types = '{boolean int float}'
+        # Add the epsilon
+        self.__terminals.append(GrammarToken("lambda", "\L"))
+        # self.terminals.append(Token("E", "exp"))
 
-        punct = '[; , \( \) { }]'
-        self.add_as_reserved(punct, self.non_terminals)
+    def parse_file(self):
+        lines = open(self.path).readlines()
+        for line in lines:
 
-        self.add_as_reserved(keywords, self.non_terminals)
-        self.add_as_reserved(types, self.non_terminals)
+            if line.startswith('{'):
+                self.create_reserved_word_token(line)
 
-        self.flatten_dict_definitions()
+            elif line.startswith('['):
+                self.create_reserved_word_token(line)
 
-    def flatten_dict_definitions(self):
+            else:
+                self.parse_rule(line)
 
-        for prod_k, prod_v in self.non_terminals.items():
-            # bfs_replace_terminals()
-            # Replace non terminals, TODO parse it till end
-            for non_term, seq in self.non_terminals.items():
-                while True:
-                    prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
-                    if temp is prod_v:
-                        self.non_terminals[prod_k] = prod_v = re.sub('(' + non_term + '(?!\w))', seq, prod_v)
-                        break  # Input = Output
-                    else:
-                        temp = prod_v
+        self.expand_non_terminals()
 
-                        # Replace terminals in other terminals
-            for terminal, sequence in self.terminals.items():
-                self.non_terminals[prod_k] = prod_v = re.sub('(' + terminal + '(?!\w))', sequence, prod_v)
+    def get_terminals(self):
+        return self.__terminals
 
-    def add_as_reserved(self, char_def, grammar_dict):
-        # Expand definitions to key-value pairs
-        expanded_def = self.ultimate_expander(char_def)
-        # Add updates to the main dictionary
-        self.__expand_dictionary(grammar_dict, expanded_def)
+    def get_non_terminals(self):
+        return self.__non_terminals
 
-    @staticmethod
-    def __expand_dictionary(dictionary, key_value_list):
-        [dictionary.update(kv) for kv in key_value_list]
-
-    @staticmethod
-    def ultimate_expander(rule: str):
+    def parse_rule(self, line: str):
         """
-        Cleans up a line which contains a definition, then maps each item to itself
-        :param rule: rule definition e.x '{if else}' -> {'if':'if'} , {'else':'else'}
-        :return: list of key:value pairs
+        Takes a rule line and adds it to the terminals / non-terminals as appropriate
+        :param line: input file line
         """
-        rule = rule.strip()
-        tokens = rule.replace(rule[0], '').replace(rule[-1], '')
+        splits = [item.strip() for tup in re.findall(r'(.+)(?<=\w|\s)(=|:)(?=\w|\s)(.+)', line.strip()) for item in tup]
 
-        token_list = tokens.split(' ')
+        # If any number other than 3 groups are matched, raise an error
+        if len(splits) != 3:
+            raise RuntimeError("Malformed rule ", line)
 
-        return [{t: t} for t in token_list]
+        rule_name = splits[0]
+        rule_assigner = splits[1]
 
-    def get_token_list(self):
-        tokens = []
-        for k, v in self.non_terminals.items():
-            token = Token(v.replace(' ', ''), k)
-            tokens.append(token)
-        return tokens
+        tok = GrammarToken(rule_name, splits[2].replace(' ', ''))
+
+        if rule_assigner == '=':
+            self.__terminals.append(tok)
+        elif rule_assigner == ':':
+            self.__non_terminals.append(tok)
+        else:
+            raise RuntimeError("Undefined rule type")
+
+    def create_reserved_word_token(self, line):
+        """
+        Creates a token object for reserved words and punctuations
+        example: { int float double }
+        :param line: name of the new token
+        :param line: 
+        :return: 
+        """
+        filtered = line[1:-2]  # Remove the brackets/braces surrounding the rule
+        keywords = filter(None, filtered.split(' '))
+
+        for word in keywords:
+            word = word.replace(' ', '')
+            self.__non_terminals.append(GrammarToken(word, word))
+
+    def expand_non_terminals(self):
+        """
+        Takes the raw grammar rules and expands the non-terminals then
+         the terminals inside this rule
+        """
+        for non_terminal in self.__non_terminals:
+            partially_flattened = self.flatten_non_terminals(non_terminal.regex)
+            non_terminal.regex = self.flatten_terminals(partially_flattened)
+
+    def flatten_non_terminals(self, input_rule: str):
+        """
+        Expands all non terminals in a given rule 
+        i.e ( note the assignment operator : , = )
+        terminal_x = 5-7
+        non_term_b : a-x | 3-4 | terminal_x
+        non_term_a : 0-9 | non_term_b
+        
+        the function output will be 
+        non_term_a: 0-9 | a-x | 3-4 | terminal_x
+        
+        :param input_rule: rule to flatten its non terminals
+        :return: a partially flattened grammar rule
+        """
+        for non_terminal in self.__non_terminals:
+            non_terminal_name = non_terminal.name
+            if non_terminal_name is not input_rule and non_terminal_name in input_rule:
+                non_terminal_regex = '(' + non_terminal_name + '(?!\w))'
+                # Solve part of the problem, then recurse
+                input_rule = re.sub(non_terminal_regex, non_terminal.regex, input_rule)
+                input_rule = self.flatten_non_terminals(input_rule)
+
+        return input_rule
+
+    def flatten_terminals(self, input_rule: str):
+        """
+        Expands terminals found in a grammar rule after substituting the non terminals
+        :param input_rule: rule to expand
+        :return: a fully flattened grammar rule
+        """
+        for terminal in self.__terminals:
+            temp = ""
+
+            # No more of this non terminal exists
+            # and
+            # Don't expand yourself
+            while temp is not input_rule \
+                    and input_rule is not terminal.regex:
+
+                temp = input_rule
+                # Find a terminal name followed by special symbols only
+                # case: digit+ digits -> don't match 'digit' that's in 'digits'
+                terminal_regex = r'(' + terminal.name + '(?!\w))'
+
+                try:
+                    # Solve part of the problem and recurse, DFS like way to replace
+                    # all non terminals
+                    input_rule = re.sub(terminal_regex, terminal.regex, input_rule)
+
+                    if temp is input_rule:
+                        break
+
+                    # If something changed, there might be more stuff to expand
+                    input_rule = self.flatten_terminals(input_rule)
+
+                except Exception as err:
+                    print(err, 'source:', terminal_regex)
+        return input_rule
 
 
-"""
-Tests
-"""
-
-# class TestStringMethods(unittest.TestCase):
-#     pass
-
-
-# def test_open_file(self):
-#     tests_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'test-files'))
-#     grammar = Grammar(tests_path + '/test_grammar.txt')
-#     self.assertEqual(grammar.pre_process(), 1)
-#     print("file:", __file__)
-#
-# def test_expand_pattern(self):
-#     gra = Grammar()
-#     gra.expand_pattern('ch=a-b')
-#     self.assertEqual(set(gra.expand_pattern('x = a-b|1-3')[1]), {'a', 'b', '1', '2', '3'})
-
-
+# Main function
 if __name__ == '__main__':
-    # unittest.main()
-    g = Grammar()
-    pp.pprint(g.non_terminals)
+    g = Grammar('../test-files/test_grammar.txt')
+    g.parse_file()
+
+    print("Terminals:")
+    for thing in g.get_terminals():
+        print(thing)
+
+    print("Tokens:")
+    for token in g.get_non_terminals():
+        print(token)
