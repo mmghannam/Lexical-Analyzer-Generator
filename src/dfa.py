@@ -18,6 +18,7 @@ class DFA:
 
         self.init_input_list()
         self.generate_dfa(nfa)
+        plt.show()
 
         # after DFA stuff
         self.accepted_tokens = []
@@ -57,9 +58,8 @@ class DFA:
                 else:  # already exists, don't add to worklist
                     self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        # self.draw()
-        self.minimize(self.graph)
-
+        self.draw()
+        # self.minimize(self.graph)
 
     # Minimization Functions
     def minimize(self, graph):
