@@ -1,6 +1,6 @@
 import string
 from collections import namedtuple, OrderedDict
-
+from networkx import *
 from prettytable import PrettyTable
 
 from .reader import Reader
@@ -14,36 +14,33 @@ class DFA:
         self.end_node = None
         self.node_index = 0
         self.transition_table = {}
+        self.graph = MultiDiGraph()
 
         self.init_input_list()
         self.generate_dfa(nfa)
 
         # after DFA stuff
         self.accepted_tokens = []
-        self.read_token_stream(filename)
+        # self.read_token_stream(filename)
 
+    # DFA graph
     def generate_dfa(self, nfa):
-        self.states, worklist = list(), list()
-
         start_state = DFAState(self.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False, None)
         self.increment_node_index()
 
+        self.states, worklist = list(), list()
         self.states.append(start_state)
         worklist.append(start_state)
 
-        # worklist is a list that contains any new DFA state generated
         while worklist:
             current_state = worklist.pop()
-            self.transition_table[current_state.index] = OrderedDict()
 
-            # for every input
             for input_literal in self.input_list:
                 # get new state by moving under input
                 new_nfa_states = nfa.get_epsilon_closures(nfa.move(current_state.NFAStates, input_literal))
 
                 # not going anywhere
                 if not new_nfa_states:  # rejection
-                    self.transition_table[current_state.index][input_literal] = None
                     continue
 
                 is_acceptance, token = nfa.check_acceptance(new_nfa_states)
@@ -55,13 +52,51 @@ class DFA:
                     self.states.append(new_dfa_state)
                     worklist.append(new_dfa_state)
 
-                    self.transition_table[current_state.index][input_literal] = index
+                    self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
                     self.increment_node_index()
                 else:  # already exists, don't add to worklist
-                    self.transition_table[current_state.index][input_literal] = index
+                    self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        self.print_transition_table()
+        self.draw()
+        self.minimize(self.graph)
 
+    # Minimization Functions
+    def minimize(self, graph):
+        '''
+        returns a copy of the graph but minimized
+
+        :param graph:
+        :return:
+        '''
+        R = self.reverse(graph)
+        self.draw(R)
+
+    def reverse(self, graph, copy=True):
+        """Return the reverse of the graph.
+
+        The reverse is a graph with the same nodes and edges
+        but with the directions of the edges reversed.
+
+        Doesn't change the original graph
+        """
+        if copy:
+            from copy import deepcopy
+
+            R = graph.__class__(name="Reverse of (%s)" % graph.name)
+            R.add_nodes_from(graph.nodes())
+            R.add_edges_from((v, u, k, deepcopy(d)) for u, v, k, d
+                             in graph.edges(keys=True, data=True))
+            R.graph = deepcopy(graph.graph)
+            R.node = deepcopy(graph.node)
+
+        else:
+            graph.pred, graph.succ = graph.succ, graph.pred
+            graph.adj = graph.succ
+            R = graph
+
+        return R
+
+    # Utilities
     def state_exists(self, new_state):
         for state in self.states:
             if new_state.NFAStates == state.NFAStates:
@@ -91,6 +126,9 @@ class DFA:
         print(table)
 
     def init_input_list(self):
+        '''
+        initiate list with all possible input symbols
+        '''
         letters = list(string.ascii_letters)
         digits = list(string.digits)
         operators = [  # '==', '!=', '>', '>=', '<', '<=',  # relational operators
@@ -100,13 +138,45 @@ class DFA:
             ';', ',', '(', ')', '{', '}'  # reserved operators
         ]
 
-        self.input_list = letters + digits + operators
-        # self.input_list = '01'
+        # self.input_list = letters + digits + operators
+        self.input_list = '01'
 
+    def draw(self, graph=None):
+        G = self.graph if graph is None else graph
+
+        for u, v, d in G.edges(data=True):
+            d['label'] = d.get('weight', '')
+
+        g = networkx.drawing.nx_agraph.to_agraph(G)
+        g.layout('dot')
+        g.draw('DFA.png')
+
+        import matplotlib.pyplot as plt
+        import matplotlib.image as mpimg
+
+        img = mpimg.imread('DFA.png')
+        plt.figure()
+        plt.imshow(img)
+        plt.show()
+
+    # Source Code File Functions
     def move(self, node_index, input):
+        '''
+        :param node_index: source node index
+        :param input: input literal
+        :return: new node index
+        '''
         return self.transition_table[node_index][input]
 
     def read_token_stream(self, filename):
+        '''
+        reads token stream from a file and runs each token
+        through the DFA.
+
+        writes tokens to output file
+
+        :param filename: name of file to be read
+        '''
         tokens = Reader(filename).getTokens()
 
         for token in tokens:
@@ -119,6 +189,12 @@ class DFA:
         f.close()
 
     def accept_token(self, token):
+        '''
+        Runs a token through the DFA
+        If it passes, it is added to the list
+
+        :param token: a single token to test
+        '''
         current_state_index = 0  # start node
         for char in token:
             current_state_index = self.move(current_state_index, char)
