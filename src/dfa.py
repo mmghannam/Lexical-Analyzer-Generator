@@ -2,16 +2,16 @@ import string
 from collections import namedtuple, OrderedDict
 from networkx import *
 from prettytable import PrettyTable
-
+import matplotlib.pyplot as plt
 from .reader import Reader
 
 DFAState = namedtuple('DFAState', ['index', 'NFAStates', 'acceptance', 'token'])
 
 
 class DFA:
+    __epsilon = '\u03B5'
+
     def __init__(self, nfa, filename):
-        self.start_node = None
-        self.end_node = None
         self.node_index = 0
         self.transition_table = {}
         self.graph = MultiDiGraph()
@@ -57,8 +57,9 @@ class DFA:
                 else:  # already exists, don't add to worklist
                     self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        self.draw()
+        # self.draw()
         self.minimize(self.graph)
+
 
     # Minimization Functions
     def minimize(self, graph):
@@ -71,6 +72,10 @@ class DFA:
         R = self.reverse(graph)
         self.draw(R)
 
+        print(self.get_start_node(R))
+
+        plt.show()
+
     def reverse(self, graph, copy=True):
         """Return the reverse of the graph.
 
@@ -79,6 +84,9 @@ class DFA:
 
         Doesn't change the original graph
         """
+        graph = self.add_last_node(graph, copy)
+        self.draw(graph)
+
         if copy:
             from copy import deepcopy
 
@@ -88,13 +96,35 @@ class DFA:
                              in graph.edges(keys=True, data=True))
             R.graph = deepcopy(graph.graph)
             R.node = deepcopy(graph.node)
-
         else:
             graph.pred, graph.succ = graph.succ, graph.pred
             graph.adj = graph.succ
             R = graph
 
         return R
+
+    def add_last_node(self, original_graph, copy=True):
+        graph = original_graph.copy() if copy else original_graph
+
+        last = DFAState(self.get_node_index(), {}, True, None)
+
+        for node in graph.copy().nodes_iter():
+            if self.states[node].acceptance:
+                self.states[node] = DFAState(self.states[node].index, self.states[node].NFAStates, False,
+                                             self.states[node].token)
+                graph.add_weighted_edges_from([(node, last.index, DFA.__epsilon)])
+
+        return graph
+
+    def get_start_node(self, graph):
+        all_keys, all_values = set(), set()
+
+        for x in graph.nodes():
+            l = bfs_predecessors(graph, x)
+            all_keys.update(l.keys())
+            all_values.update(l.values())
+
+        return int(list((all_values - all_keys))[0])
 
     # Utilities
     def state_exists(self, new_state):
@@ -151,13 +181,12 @@ class DFA:
         g.layout('dot')
         g.draw('DFA.png')
 
-        import matplotlib.pyplot as plt
         import matplotlib.image as mpimg
 
         img = mpimg.imread('DFA.png')
         plt.figure()
         plt.imshow(img)
-        plt.show()
+        plt.show(block=False)
 
     # Source Code File Functions
     def move(self, node_index, input):
