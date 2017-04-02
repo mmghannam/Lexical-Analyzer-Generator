@@ -1,18 +1,9 @@
 from src.dfa import *
+from src.grammar import Grammar
 from src.nfa import *
-from src.grammar_token import GrammarToken
 
-tokens = [
-    GrammarToken('bibo', '(0|1)*0(0|1)')
-    # GrammarToken(',', ','),
-    # GrammarToken('\\(', '\\)'),
-    # GrammarToken('a-z(a-z|0-9)*', 'id'),
-    # GrammarToken('if', 'if'),
-    # GrammarToken('\\*|\\/', 'mulop')
-]
-
-nfa = NFA.from_tokens(tokens)
-
+g = Grammar(path='src/grammar.txt')
+nfa = NFA.from_grammar(g)
 print('start: ', nfa.start_node)
 print('end: ', nfa.end_node)
 
