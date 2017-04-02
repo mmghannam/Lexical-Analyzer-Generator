@@ -8,6 +8,7 @@ class NFA:
     # current node index is kept as a static variable to ensure that
     # no two node are given the same index
     __cni = 1
+    __epsilon = '\u03B5'
 
     def __init__(self):
         self.start_node = None
@@ -23,7 +24,6 @@ class NFA:
             for token in tokens[1:]:
                 token_nfa = NFA.from_regex(add_concatenation_operator_to_regex(token.regex))
                 token_nfa.graph.node[token_nfa.end_node]['acceptance'] = token.name
-                # add concatenation operator in regex for easier parsing
                 nfa.union(token_nfa)
             return nfa
         else:
@@ -43,22 +43,28 @@ class NFA:
             current_char = regex[i]
             # checks if its the start of a new expression
             if current_char == '(':
-                current_i = i
+                current_i = i + 1
+                opened_brackets = 1
+                i += 1
                 # loops till the end of the expression
-                while regex[i] != ')':
+                while opened_brackets:
+                    if regex[i] == ')':
+                        opened_brackets -= 1
+                    elif regex[i] == '(':
+                        opened_brackets += 1
                     i += 1
-
-                operands.push(NFA.from_regex(regex[current_i + 1:i]))
-            # bypass the end of expression character
-            elif current_char == ')':
-                pass
+                i -= 1
+                operands.push(NFA.from_regex(regex[current_i:i]))
             # in case of an escaped special character like '\*'
             elif i < len(regex) - 1 and current_char == '\\':
-                operands.push(NFA.from_simple_regex(regex[i + 1]))
+                if regex[i + 1] == 'L':
+                    operands.push(NFA.empty())
+                else:
+                    operands.push(NFA.from_simple_regex(regex[i + 1]))
                 # skip the next char
                 i += 1
             # checks for operands
-            elif current_char not in '*&|':
+            elif current_char not in '*&|+':
                 # checks for existence of a range in form 'a-c' which is equivalent to 'a|b|c'
                 if i < len(regex) - 2 and regex[i + 1] == '-' and regex[i + 2]:
                     operands.push(NFA.from_simple_regex(regex[i:i + 3]))
@@ -110,6 +116,8 @@ class NFA:
             operands.push(first_operand_nfa.union(second_operand_nfa))
         elif operator == '*':
             operands.push(operands.pop().kleene_closure())
+        elif operator == '+':
+            operands.push(operands.pop().plus())
 
     @staticmethod
     def get_node_index():
@@ -144,7 +152,6 @@ class NFA:
          concatenation or kleene closure operations
          examples : 'a' , 'a-c'
         """
-        # TODO : Add Doctests
         if '-' in regex:
             start_char, _, end_char = regex
             if start_char < end_char:
@@ -161,7 +168,7 @@ class NFA:
         if not self.start_node and not self.end_node:
             self.start_node = NFA.get_node_index()
             self.end_node = NFA.get_node_index()
-            self.graph.add_weighted_edges_from([(self.start_node, self.end_node, ord(edge_weight))])
+            self.graph.add_weighted_edges_from([(self.start_node, self.end_node, repr(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
         # create start node
@@ -171,16 +178,16 @@ class NFA:
 
         for char_ord in range(ord(start_char), ord(end_char) + 1):
             # connect starting node to first node before character
-            self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), 0)])
+            self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), NFA.__epsilon)])
             # connect first node before character to the node after character
             self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.get_node_index(), char_ord)])
             # connect node after character with end node
-            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.end_node, 0)])
+            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.end_node, NFA.__epsilon)])
 
     def concatenate(self, nfa):
         if self.start_node and self.end_node:
             # connect the end of the first graph with the start of the second
-            self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, 0)])
+            self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, NFA.__epsilon)])
             # add the second graph edges to self.graph
             self.graph = nx.compose(self.graph, nfa.graph)
             # update new end node with the second nfa's end node
@@ -202,12 +209,12 @@ class NFA:
         self.end_node = self.get_node_index()
 
         # connect new start to both starts of the two graphs
-        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, 0)])
-        self.graph.add_weighted_edges_from([(self.start_node, nfa.start_node, 0)])
+        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.__epsilon)])
+        self.graph.add_weighted_edges_from([(self.start_node, nfa.start_node, NFA.__epsilon)])
 
         # connect the two ends of the graphs with the new end
-        self.graph.add_weighted_edges_from([(last_end_node, self.end_node, 0),
-                                            (nfa.end_node, self.end_node, 0)
+        self.graph.add_weighted_edges_from([(last_end_node, self.end_node, NFA.__epsilon),
+                                            (nfa.end_node, self.end_node, NFA.__epsilon)
                                             ])
 
         # add the second graph edges to self.graph
@@ -222,7 +229,7 @@ class NFA:
         last_end_node = self.end_node
 
         # epsilon transition from last end node to last start node
-        self.graph.add_weighted_edges_from([(last_end_node, last_start_node, 0)])
+        self.graph.add_weighted_edges_from([(last_end_node, last_start_node, NFA.__epsilon)])
 
         # create new start and end nodes
         self.start_node = self.get_node_index()
@@ -230,16 +237,35 @@ class NFA:
 
         # add epsilon transition from new start node to new end node,
         # and add epsilon transition from new start node to new end node
-        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, 0),
-                                            (last_end_node, self.end_node, 0),
-                                            (self.start_node, self.end_node, 0)])
+        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.__epsilon),
+                                            (last_end_node, self.end_node, NFA.__epsilon),
+                                            (self.start_node, self.end_node, NFA.__epsilon)])
 
         return self
 
     def plus(self):
-        # TODO : Implement in from_regex method
         # epsilon transition from end node to start node
-        self.graph.add_weighted_edges_from([(self.end_node, self.start_node, 0)])
+        self.graph.add_weighted_edges_from([(self.end_node, self.start_node, NFA.__epsilon)])
+
+        return self
+
+    @staticmethod
+    def empty():
+        """
+        This method returns an empty NFA,
+        where the start node and the end node are connected with an epsilon.
+        """
+        # create new NFA
+        nfa = NFA()
+
+        # create start and end nodes
+        nfa.start_node = NFA.get_node_index()
+        nfa.end_node = NFA.get_node_index()
+
+        # connect start and end node with an epsilon
+        nfa.graph.add_weighted_edges_from([(nfa.start_node, nfa.end_node, NFA.__epsilon)])
+
+        return nfa
 
     def is_acceptance_node(self, node_index):
         """

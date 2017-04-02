@@ -44,16 +44,6 @@ class Grammar:
     def __init__(self, path=None):
         self.classes = []
 
-        self.letters = regexex.generate_range('a', 'z')
-        self.numbers = regexex.generate_range('0', '9')
-
-        self.classes.append((TokenType.letter, self.letters))
-        self.classes.append((TokenType.digit, self.numbers))
-        self.classes.append((TokenType.reserved_word, ['if', 'else', 'while']))
-        self.classes.append((TokenType.type, ['boolean', 'int', 'float']))
-        self.classes.append((TokenType.rel_op, ['==', '!=', '>', '>=', '<', '<=']))
-        self.classes.append((TokenType.assignment_op, ['=']))
-        self.classes.append((TokenType.add_op, ['+', '-']))
 
         # for file parsing, check if a line starts with [,{
         keywords = '{if else while}'
@@ -101,12 +91,13 @@ class Grammar:
 
         token_list = tokens.split(' ')
 
-        return [{t: t.replace('\\', '')} for t in token_list]
+        return [{t: t} for t in token_list]
 
     def get_token_list(self):
         tokens = []
         for k, v in self.non_terminals.items():
-            tokens.append(Token(v.replace(' ', ''), k))
+            token = Token(v.replace(' ', ''), k)
+            tokens.append(token)
         return tokens
 
 
