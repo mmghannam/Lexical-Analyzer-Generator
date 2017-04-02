@@ -16,6 +16,10 @@ class NFA:
         self.graph = DiGraph()
 
     @staticmethod
+    def from_grammar(grammar):
+        return NFA.from_tokens(grammar.get_non_terminals())
+
+    @staticmethod
     def from_tokens(tokens):
         if len(tokens) > 0:
             first_token_nfa = NFA.from_regex(add_concatenation_operator_to_regex(tokens[0].regex))
@@ -34,7 +38,7 @@ class NFA:
         """
         This method implements a shunting-yard-like algorithm to parse each token's regex
         """
-        priority = string_to_priority_hash('(*&|)')
+        priority = string_to_priority_hash('(*+&|)')
         operands = Stack()
         operators = Stack()
         i = 0
@@ -81,7 +85,7 @@ class NFA:
                 else:
                     # perform all operations in stack to be able to push the lower priority operator
                     operator = operators.pop()
-                    while operator and priority[current_char] < priority[operator]:
+                    while operator and priority[current_char] <= priority[operator]:
                         # evaluate the operation ( result is push back to operands stack )
                         NFA.evaluate_operation(operator, operands)
                         # remove the handled operation from stack
@@ -152,7 +156,7 @@ class NFA:
          concatenation or kleene closure operations
          examples : 'a' , 'a-c'
         """
-        if '-' in regex:
+        if '-' in regex and len(regex) == 3:
             start_char, _, end_char = regex
             if start_char < end_char:
                 self.add_nodes_in_range(start_char, end_char)

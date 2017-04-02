@@ -9,12 +9,16 @@ class Grammar:
         # for file parsing, check if a line starts with [,{
 
         self.path = path
+
         self.__terminals = []
         self.__non_terminals = []
 
         # Add the epsilon
         self.__terminals.append(GrammarToken("lambda", "\L"))
         # self.terminals.append(Token("E", "exp"))
+
+        if self.path:
+            self.parse_file()
 
     def parse_file(self):
         lines = open(self.path).readlines()
