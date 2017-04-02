@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 from networkx import *
-
+from networkx.drawing.nx_agraph import graphviz_layout
 from src.helpers import *
 
 
@@ -291,11 +291,12 @@ class NFA:
 
     def draw(self):
         el = get_edge_attributes(self.graph, 'weight')
-        pos = circular_layout(self.graph, scale=2)
+        pos = graphviz_layout(self.graph)
         draw_networkx(self.graph, pos)
 
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
         plt.show()
+
 
     def __iter__(self):
         """
