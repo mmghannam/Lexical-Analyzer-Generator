@@ -144,9 +144,9 @@ class DFA:
 
     def export_table_as_json(self):
         import json
-        f = open('table.json', 'w')
-        json.dump(self.transition_table, f, indent=4)
-        f.close()
+
+        with open('table.json', 'w') as f:
+            json.dump(self.transition_table, f, indent=4)
 
     def dump_table(self):
         import pickle
@@ -201,12 +201,12 @@ class DFA:
         '''
         letters = list(string.ascii_letters)
         digits = list(string.digits)
-        operators = [  # '==', '!=', '>', '>=', '<', '<=',  # relational operators
-            '=',  # assignment operator
-            '+', '-',  # add operators
-            '*', '/',  # multiply operators
-            ';', ',', '(', ')', '{', '}'  # reserved operators
-        ]
+        operators = ['!', '>', '<',  # relational operators ('==', '!=', '>', '>=', '<', '<=')
+                     '=',  # assignment operator
+                     '+', '-',  # add operators
+                     '*', '/',  # multiply operators
+                     ';', ',', '(', ')', '{', '}'  # reserved operators
+                     ]
 
         self.input_list = letters + digits + operators
         # self.input_list = '01'
