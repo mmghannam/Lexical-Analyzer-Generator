@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from networkx import *
 from networkx.drawing.nx_agraph import graphviz_layout
+
 from src.helpers import *
 
 
@@ -301,7 +302,9 @@ class NFA:
         draw_networkx(self.graph, pos)
 
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
-        plt.show()
+        plt.show(block=False)
+
+        self.draw_png()
 
     def draw_png(self):
         for u, v, d in self.graph.edges(data=True):
@@ -366,7 +369,10 @@ class NFA:
             for edge in self.graph.edges_iter(node, True):
                 from_node, to_node, weight = edge
                 weight = weight['weight']
-                weight = weight if weight == NFA.__epsilon else eval(weight)
+                try:
+                    weight = weight if weight == NFA.__epsilon else eval(weight)
+                except TypeError:
+                    weight = str(chr(weight))
 
                 for input in inputs:
                     if weight == str(input):

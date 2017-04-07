@@ -1,8 +1,10 @@
 import string
 from collections import namedtuple, OrderedDict
+
+import matplotlib.pyplot as plt
 from networkx import *
 from prettytable import PrettyTable
-import matplotlib.pyplot as plt
+
 from .reader import Reader
 
 DFAState = namedtuple('DFAState', ['index', 'NFAStates', 'acceptance', 'token'])
@@ -18,11 +20,11 @@ class DFA:
 
         self.init_input_list()
         self.generate_dfa(nfa)
-        plt.show()
+        # plt.show()
 
         # after DFA stuff
         self.accepted_tokens = []
-        # self.read_token_stream(filename)
+        self.read_token_stream(filename)
 
     # DFA graph
     def generate_dfa(self, nfa):
@@ -41,8 +43,9 @@ class DFA:
                 new_nfa_states = nfa.get_epsilon_closures(nfa.move(current_state.NFAStates, input_literal))
 
                 # not going anywhere
-                if not new_nfa_states:  # rejection
-                    continue
+                # TODO: handle rejection state
+                # if not new_nfa_states:  # rejection
+                #     continue
 
                 is_acceptance, token = nfa.check_acceptance(new_nfa_states)
                 new_dfa_state = DFAState(self.get_node_index(), new_nfa_states, is_acceptance, token)
@@ -60,6 +63,7 @@ class DFA:
 
         self.draw()
         # self.minimize(self.graph)
+        self.generate_transition_table()
 
     # Minimization Functions
     def minimize(self, graph):
@@ -126,19 +130,41 @@ class DFA:
 
         return int(list((all_values - all_keys))[0])
 
-    # Utilities
-    def state_exists(self, new_state):
-        for state in self.states:
-            if new_state.NFAStates == state.NFAStates:
-                return True, state.index
+    # Transition Table
+    def generate_transition_table(self):
+        for node in self.graph.nodes_iter():
+            self.transition_table[node] = OrderedDict()
 
-        return False, new_state.index
+            for u, v, d in self.graph.out_edges(node, data=True):
+                self.transition_table[node][d['weight']] = v
 
-    def get_node_index(self):
-        return self.node_index
+        self.dump_table()
+        # self.print_transition_table()
+        # self.export_table_as_json()
 
-    def increment_node_index(self):
-        self.node_index += 1
+    def export_table_as_json(self):
+        import json
+        f = open('table.json', 'w')
+        json.dump(self.transition_table, f, indent=4)
+        f.close()
+
+    def dump_table(self):
+        import pickle
+
+        with open('table.pic', 'wb') as t:
+            pickle.dump(self.transition_table, t, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # with open('dfa_graph.pic', 'wb') as g:
+            #     pickle.dump(self.graph, g, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_table(self):
+        import pickle
+
+        with open('table.pic', 'rb') as t:
+            self.transition_table = pickle.load(t)
+
+            # with open('dfa_graph.pic', 'wb') as g:
+            #     self.graph = pickle.load(g)
 
     def print_transition_table(self):
         print('=' * 100)
@@ -155,6 +181,20 @@ class DFA:
 
         print(table)
 
+    # Utilities
+    def state_exists(self, new_state):
+        for state in self.states:
+            if new_state.NFAStates == state.NFAStates:
+                return True, state.index
+
+        return False, new_state.index
+
+    def get_node_index(self):
+        return self.node_index
+
+    def increment_node_index(self):
+        self.node_index += 1
+
     def init_input_list(self):
         '''
         initiate list with all possible input symbols
@@ -168,8 +208,8 @@ class DFA:
             ';', ',', '(', ')', '{', '}'  # reserved operators
         ]
 
-        # self.input_list = letters + digits + operators
-        self.input_list = '01'
+        self.input_list = letters + digits + operators
+        # self.input_list = '01'
 
     def draw(self, graph=None):
         G = self.graph if graph is None else graph
@@ -178,7 +218,7 @@ class DFA:
             d['label'] = d.get('weight', '')
 
         g = networkx.drawing.nx_agraph.to_agraph(G)
-        g.layout('dot')
+        g.layout()
         g.draw('DFA.png')
 
         import matplotlib.image as mpimg
@@ -213,7 +253,7 @@ class DFA:
 
         f = open('output.txt', 'w')
         for accepted_token in self.accepted_tokens:
-            f.write(accepted_token + ',\n')
+            f.write(accepted_token + '\n')
 
         f.close()
 
