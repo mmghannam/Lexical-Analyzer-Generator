@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from networkx import *
 from networkx.drawing.nx_agraph import graphviz_layout
+
 from src.helpers import *
 
 
@@ -28,6 +29,7 @@ class NFA:
             for token in tokens[1:]:
                 token_nfa = NFA.from_regex(add_concatenation_operator_to_regex(token.regex))
                 token_nfa.graph.node[token_nfa.end_node]['acceptance'] = token.name
+                # add concatenation operator in regex for easier parsing
                 nfa.union(token_nfa)
             return nfa
         else:
@@ -271,6 +273,7 @@ class NFA:
 
         return nfa
 
+    # NFA Utilities
     def is_acceptance_node(self, node_index):
         """
         Returns a boolean of whether the given node is an acceptance node
@@ -299,28 +302,19 @@ class NFA:
         draw_networkx(self.graph, pos)
 
         draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
-        plt.show()
+        plt.show(block=False)
 
+        self.draw_png()
 
-    def __iter__(self):
-        """
-        :return: an iterator each time it contains a node and a dictionary
-         the dictionary contains each neighbor and the cost to go to that neighbor
+    def draw_png(self):
+        for u, v, d in self.graph.edges(data=True):
+            d['label'] = d.get('weight', '')
 
-         dictionary structure:
-            key: neighbor index
-            value: weight on edge between source node and specified neighbor
-        """
+        g = networkx.drawing.nx_agraph.to_agraph(self.graph)
+        g.layout('dot')
+        g.draw('NFA.png')
 
-        for node in self.graph.nodes_iter():
-            node_neighbors = self.graph.neighbors(node)
-
-            neighbors_dict = dict()
-            for neighbor in node_neighbors:
-                neighbors_dict[neighbor] = self.graph.get_edge_data(node, neighbor)['weight']
-
-            yield node, neighbors_dict
-
+    # DFA Utilities
     def __epsilon_closure(self, node):
         """
         calculates the epsilon closures of a given state.
@@ -330,19 +324,22 @@ class NFA:
         :param node: any given node in the NFA
         :return: immutable set of epsilon closures
         """
-
         epsilon_closure = {node}
 
         node_neighbors = self.graph.neighbors(node)
         for neighbor in node_neighbors:
             weight = self.graph.get_edge_data(node, neighbor)['weight']
 
-            if weight == 0:
+            if weight == NFA.__epsilon:
                 epsilon_closure.add(neighbor)
 
         return epsilon_closure
 
     def get_epsilon_closures(self, nodes):
+        '''
+        Applies __epsilon_closure() recursively to detect all epsilon closures
+        of given nodes
+        '''
         nodes = {nodes} if not isinstance(nodes, set) else nodes
         epsilon_closures = set()
 
@@ -358,6 +355,10 @@ class NFA:
         return self.get_epsilon_closures(nodes)
 
     def move(self, nodes, input):
+        '''
+        moves through the NFA starting from nodes under some input
+        and returns the destination
+        '''
         destination = set()
 
         nodes = {nodes} if not isinstance(nodes, set) else nodes
@@ -368,23 +369,24 @@ class NFA:
             for edge in self.graph.edges_iter(node, True):
                 from_node, to_node, weight = edge
                 weight = weight['weight']
+                try:
+                    weight = weight if weight == NFA.__epsilon else eval(weight)
+                except TypeError:
+                    weight = str(chr(weight))
 
                 for input in inputs:
-                    if weight == ord(str(input)):
+                    if weight == str(input):
                         destination.add(to_node)
 
         destination.update(self.get_epsilon_closures(destination))
         return destination
 
     def check_acceptance(self, nodes):
+        '''
+        :param nodes: the NFA states present in a single DFA state
+        :return: True if any node in nodes is acceptance
+        '''
         for node in nodes:
             if self.is_acceptance_node(node):
                 return True, self.get_token_name_from_acceptance_node(node)
         return False, None
-
-    def get_acceptance_states(self):
-        print('=' * 100, '\nnfa acceptance states:')
-        for node in self.graph.nodes_iter():
-            if self.is_acceptance_node(node):
-                print(node)
-        print('=' * 100)

@@ -9,4 +9,18 @@ class Reader:
         file = open(self.filename)
         content = file.read()
 
-        return tokenize.TreebankWordTokenizer().tokenize(content)
+        tokens = tokenize.TreebankWordTokenizer().tokenize(content)
+
+        relops = ['!=', '>=', '<=']
+
+        for i in range(len(tokens)):
+            try:
+                new_token = tokens[i] + tokens[i + 1]
+            except IndexError:
+                pass
+
+            if new_token in relops:
+                tokens[i] = new_token
+                del tokens[i + 1]
+
+        return tokens
