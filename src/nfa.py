@@ -7,6 +7,9 @@ from src.helpers import *
 class NFA(FA):
     def __init__(self):
         super().__init__()
+
+        # TODO: use MultiDiGraph()
+        self.graph = DiGraph()
         self.start_node = None
         self.end_node = None
 
@@ -309,33 +312,6 @@ class NFA(FA):
         plt.show()
 
     # DFA Utilities
-    # def move(self, nodes, input):
-        # """
-        # moves through the NFA starting from nodes under some input
-        # and returns the destination
-        # """
-        # destination = set()
-        #
-        # nodes = {nodes} if not isinstance(nodes, set) else nodes
-        # nodes.update(self.get_epsilon_closures(nodes))
-        # inputs = {input} if not isinstance(input, set) else input
-        #
-        # for node in nodes:
-        #     for edge in self.graph.edges_iter(node, True):
-        #         from_node, to_node, weight = edge
-        #         weight = weight['weight']
-        #         try:
-        #             weight = weight if weight == NFA.epsilon else eval(weight)
-        #         except TypeError:
-        #             weight = str(chr(weight))
-        #
-        #         for input in inputs:
-        #             if weight == str(input):
-        #                 destination.add(to_node)
-        #
-        # destination.update(self.get_epsilon_closures(destination))
-        # return destination
-
     def check_acceptance(self, nodes):
         '''
         :param nodes: the NFA states present in a single DFA state

@@ -4,7 +4,9 @@ from src.grammar_token import GrammarToken
 from src.nfa import *
 
 tokens = [
-    GrammarToken('bibo', '(0|1)*0(0|1)')
+    # GrammarToken('bibo', '(0|1)*0(0|1)')
+    # GrammarToken('bibo', '(0|1)*0(0|1)')
+    GrammarToken('bibo', '(0|1)')
 ]
 nfa = NFA.from_tokens(tokens)
 
