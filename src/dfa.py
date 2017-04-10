@@ -5,34 +5,40 @@ import matplotlib.pyplot as plt
 from networkx import *
 from prettytable import PrettyTable
 
+from src.fa import *
 from .reader import Reader
 
 DFAState = namedtuple('DFAState', ['index', 'NFAStates', 'acceptance', 'token'])
 
 
-class DFA:
-    __epsilon = '\u03B5'
-
-    def __init__(self, nfa, filename):
-        self.node_index = 0
+class DFA(FA):
+    def __init__(self, nfa):
+        super().__init__()
         self.transition_table = {}
-        self.graph = MultiDiGraph()
 
         self.init_input_list()
-        self.generate_dfa(nfa)
-        # plt.show()
+        dfa = self.generate_dfa(nfa)
+
+        self.graph = dfa.graph
+        self.node_index = dfa.node_index
+        self.states = dfa.states
 
         # after DFA stuff
         self.accepted_tokens = []
-        self.read_token_stream(filename)
+        self.symbol_table = {}
+        # self.read_token_stream(filename)
 
     # DFA graph
     def generate_dfa(self, nfa):
-        start_state = DFAState(self.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False, None)
-        self.increment_node_index()
+        assert isinstance(nfa, FA)
 
-        self.states, worklist = list(), list()
-        self.states.append(start_state)
+        new_dfa = FA()
+
+        start_state = DFAState(new_dfa.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False, None)
+        new_dfa.increment_node_index()
+
+        worklist = list()
+        new_dfa.states.append(start_state)
         worklist.append(start_state)
 
         while worklist:
@@ -48,35 +54,46 @@ class DFA:
                 #     continue
 
                 is_acceptance, token = nfa.check_acceptance(new_nfa_states)
-                new_dfa_state = DFAState(self.get_node_index(), new_nfa_states, is_acceptance, token)
+                new_dfa_state = DFAState(new_dfa.get_node_index(), new_nfa_states, is_acceptance, token)
                 # check if state already exists
                 state_exists, index = self.state_exists(new_dfa_state)
 
                 if not state_exists:  # new state
-                    self.states.append(new_dfa_state)
+                    new_dfa.states.append(new_dfa_state)
                     worklist.append(new_dfa_state)
 
-                    self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
-                    self.increment_node_index()
+                    new_dfa.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
+                    new_dfa.increment_node_index()
                 else:  # already exists, don't add to worklist
-                    self.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
+                    new_dfa.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        self.draw()
-        # self.minimize(self.graph)
-        self.generate_transition_table()
+        self.draw(new_dfa)
+        self.minimize(self.graph)
+        # self.generate_transition_table()
+
+        return new_dfa
 
     # Minimization Functions
     def minimize(self, graph):
-        '''
+        """
         returns a copy of the graph but minimized
 
         :param graph:
         :return:
-        '''
-        R = self.reverse(graph)
-        self.draw(R)
+        """
+        R1 = self.reverse(graph)
+        self.draw(R1)
 
-        print(self.get_start_node(R))
+        print(self.get_start_node(R1))
+
+        D1 = self.generate_dfa(R1)
+        self.draw(D1)
+
+        R2 = self.reverse(D1.graph)
+        self.draw(R2)
+
+        D2 = self.generate_dfa(R2)
+        self.draw()
 
         plt.show()
 
@@ -116,7 +133,7 @@ class DFA:
             if self.states[node].acceptance:
                 self.states[node] = DFAState(self.states[node].index, self.states[node].NFAStates, False,
                                              self.states[node].token)
-                graph.add_weighted_edges_from([(node, last.index, DFA.__epsilon)])
+                graph.add_weighted_edges_from([(node, last.index, DFA.epsilon)])
 
         return graph
 
@@ -131,11 +148,13 @@ class DFA:
         return int(list((all_values - all_keys))[0])
 
     # Transition Table
-    def generate_transition_table(self):
-        for node in self.graph.nodes_iter():
+    def generate_transition_table(self, graph=None):
+        G = self.graph if graph is None else graph
+
+        for node in G.nodes_iter():
             self.transition_table[node] = OrderedDict()
 
-            for u, v, d in self.graph.out_edges(node, data=True):
+            for u, v, d in G.out_edges(node, data=True):
                 self.transition_table[node][d['weight']] = v
 
         self.dump_table()
@@ -189,11 +208,11 @@ class DFA:
 
         return False, new_state.index
 
-    def get_node_index(self):
-        return self.node_index
+    # def get_node_index(self):
+    #     return self.node_index
 
-    def increment_node_index(self):
-        self.node_index += 1
+    # def increment_node_index(self):
+    #     self.node_index += 1
 
     def init_input_list(self):
         '''
@@ -208,8 +227,8 @@ class DFA:
                      ';', ',', '(', ')', '{', '}'  # reserved operators
                      ]
 
-        self.input_list = letters + digits + operators
-        # self.input_list = '01'
+        # self.input_list = letters + digits + operators
+        self.input_list = '01'
 
     def draw(self, graph=None):
         G = self.graph if graph is None else graph
@@ -271,3 +290,6 @@ class DFA:
         current_state = self.states[current_state_index]
         if current_state.acceptance:
             self.accepted_tokens.append(current_state.token)
+
+            if current_state.token == 'id':
+                self.symbol_table[token] = {}

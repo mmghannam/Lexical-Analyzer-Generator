@@ -1,20 +1,14 @@
 import matplotlib.pyplot as plt
-from networkx import *
-from networkx.drawing.nx_agraph import graphviz_layout
 
+from src.fa import *
 from src.helpers import *
 
 
-class NFA:
-    # current node index is kept as a static variable to ensure that
-    # no two node are given the same index
-    __cni = 1
-    __epsilon = '\u03B5'
-
+class NFA(FA):
     def __init__(self):
+        super().__init__()
         self.start_node = None
         self.end_node = None
-        self.graph = DiGraph()
 
     @staticmethod
     def from_grammar(grammar):
@@ -126,15 +120,6 @@ class NFA:
             operands.push(operands.pop().plus())
 
     @staticmethod
-    def get_node_index():
-        """
-        This method keeps track of the index of nodes and returns a different index each time by incrementing the static
-        class variable __cni
-        """
-        NFA.__cni += 1
-        return NFA.__cni - 1
-
-    @staticmethod
     def from_simple_regex(regex):
         """
         This method creates an NFA from a simple regex containing either characters or ranges
@@ -167,33 +152,39 @@ class NFA:
         else:
             self.concatenate_node(regex)
         if not self.end_node:
-            self.end_node = NFA.__cni - 1
+            self.end_node = self.get_node_index() - 1
         return self
 
     def concatenate_node(self, edge_weight):
         if not self.start_node and not self.end_node:
-            self.start_node = NFA.get_node_index()
-            self.end_node = NFA.get_node_index()
+            self.start_node = self.get_node_index()
+            self.increment_node_index()
+            self.end_node = self.get_node_index()
+            self.increment_node_index()
             self.graph.add_weighted_edges_from([(self.start_node, self.end_node, repr(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
         # create start node
         self.start_node = self.get_node_index()
+        self.increment_node_index()
         # create end_node
         self.end_node = self.get_node_index()
+        self.increment_node_index()
 
         for char_ord in range(ord(start_char), ord(end_char) + 1):
             # connect starting node to first node before character
-            self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), NFA.__epsilon)])
+            self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), NFA.epsilon)])
+            self.increment_node_index()
             # connect first node before character to the node after character
-            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.get_node_index(), char_ord)])
+            self.graph.add_weighted_edges_from([(self.get_node_index(), self.get_node_index(), char_ord)])
+            self.increment_node_index()
             # connect node after character with end node
-            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.end_node, NFA.__epsilon)])
+            self.graph.add_weighted_edges_from([(self.get_node_index(), self.end_node, NFA.epsilon)])
 
     def concatenate(self, nfa):
         if self.start_node and self.end_node:
             # connect the end of the first graph with the start of the second
-            self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, NFA.__epsilon)])
+            self.graph.add_weighted_edges_from([(self.end_node, nfa.start_node, NFA.epsilon)])
             # add the second graph edges to self.graph
             self.graph = nx.compose(self.graph, nfa.graph)
             # update new end node with the second nfa's end node
@@ -212,15 +203,17 @@ class NFA:
 
         # create new start and end nodes
         self.start_node = self.get_node_index()
+        self.increment_node_index()
         self.end_node = self.get_node_index()
+        self.increment_node_index()
 
         # connect new start to both starts of the two graphs
-        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.__epsilon)])
-        self.graph.add_weighted_edges_from([(self.start_node, nfa.start_node, NFA.__epsilon)])
+        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.epsilon)])
+        self.graph.add_weighted_edges_from([(self.start_node, nfa.start_node, NFA.epsilon)])
 
         # connect the two ends of the graphs with the new end
-        self.graph.add_weighted_edges_from([(last_end_node, self.end_node, NFA.__epsilon),
-                                            (nfa.end_node, self.end_node, NFA.__epsilon)
+        self.graph.add_weighted_edges_from([(last_end_node, self.end_node, NFA.epsilon),
+                                            (nfa.end_node, self.end_node, NFA.epsilon)
                                             ])
 
         # add the second graph edges to self.graph
@@ -235,23 +228,25 @@ class NFA:
         last_end_node = self.end_node
 
         # epsilon transition from last end node to last start node
-        self.graph.add_weighted_edges_from([(last_end_node, last_start_node, NFA.__epsilon)])
+        self.graph.add_weighted_edges_from([(last_end_node, last_start_node, NFA.epsilon)])
 
         # create new start and end nodes
         self.start_node = self.get_node_index()
+        self.increment_node_index()
         self.end_node = self.get_node_index()
+        self.increment_node_index()
 
         # add epsilon transition from new start node to new end node,
         # and add epsilon transition from new start node to new end node
-        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.__epsilon),
-                                            (last_end_node, self.end_node, NFA.__epsilon),
-                                            (self.start_node, self.end_node, NFA.__epsilon)])
+        self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.epsilon),
+                                            (last_end_node, self.end_node, NFA.epsilon),
+                                            (self.start_node, self.end_node, NFA.epsilon)])
 
         return self
 
     def plus(self):
         # epsilon transition from end node to start node
-        self.graph.add_weighted_edges_from([(self.end_node, self.start_node, NFA.__epsilon)])
+        self.graph.add_weighted_edges_from([(self.end_node, self.start_node, NFA.epsilon)])
 
         return self
 
@@ -265,11 +260,13 @@ class NFA:
         nfa = NFA()
 
         # create start and end nodes
-        nfa.start_node = NFA.get_node_index()
-        nfa.end_node = NFA.get_node_index()
+        nfa.start_node = nfa.get_node_index()
+        nfa.increment_node_index()
+        nfa.end_node = nfa.get_node_index()
+        nfa.increment_node_index()
 
         # connect start and end node with an epsilon
-        nfa.graph.add_weighted_edges_from([(nfa.start_node, nfa.end_node, NFA.__epsilon)])
+        nfa.graph.add_weighted_edges_from([(nfa.start_node, nfa.end_node, NFA.epsilon)])
 
         return nfa
 
@@ -282,7 +279,7 @@ class NFA:
         try:
             self.graph.node[node_index]['acceptance']
             return True
-        except:
+        except AttributeError:
             return False
 
     def get_token_name_from_acceptance_node(self, node_index):
@@ -297,16 +294,6 @@ class NFA:
             return None
 
     def draw(self):
-        el = get_edge_attributes(self.graph, 'weight')
-        pos = graphviz_layout(self.graph)
-        draw_networkx(self.graph, pos)
-
-        draw_networkx_edge_labels(self.graph, pos=pos, edge_labels=el)
-        plt.show(block=False)
-
-        self.draw_png()
-
-    def draw_png(self):
         for u, v, d in self.graph.edges(data=True):
             d['label'] = d.get('weight', '')
 
@@ -314,72 +301,40 @@ class NFA:
         g.layout('dot')
         g.draw('NFA.png')
 
+        import matplotlib.image as mpimg
+
+        img = mpimg.imread('NFA.png')
+        plt.figure()
+        plt.imshow(img)
+        plt.show()
+
     # DFA Utilities
-    def __epsilon_closure(self, node):
-        """
-        calculates the epsilon closures of a given state.
-        the epsilon closure is given by the set of states to which transitioning
-        to them doesn't have a cost
-
-        :param node: any given node in the NFA
-        :return: immutable set of epsilon closures
-        """
-        epsilon_closure = {node}
-
-        node_neighbors = self.graph.neighbors(node)
-        for neighbor in node_neighbors:
-            weight = self.graph.get_edge_data(node, neighbor)['weight']
-
-            if weight == NFA.__epsilon:
-                epsilon_closure.add(neighbor)
-
-        return epsilon_closure
-
-    def get_epsilon_closures(self, nodes):
-        '''
-        Applies __epsilon_closure() recursively to detect all epsilon closures
-        of given nodes
-        '''
-        nodes = {nodes} if not isinstance(nodes, set) else nodes
-        epsilon_closures = set()
-
-        for node in nodes:
-            for epsilon_node in self.__epsilon_closure(node):
-                if epsilon_node not in nodes:
-                    epsilon_closures.add(epsilon_node)
-
-        if not epsilon_closures:
-            return nodes
-
-        nodes.update(epsilon_closures)
-        return self.get_epsilon_closures(nodes)
-
-    def move(self, nodes, input):
-        '''
-        moves through the NFA starting from nodes under some input
-        and returns the destination
-        '''
-        destination = set()
-
-        nodes = {nodes} if not isinstance(nodes, set) else nodes
-        nodes.update(self.get_epsilon_closures(nodes))
-        inputs = {input} if not isinstance(input, set) else input
-
-        for node in nodes:
-            for edge in self.graph.edges_iter(node, True):
-                from_node, to_node, weight = edge
-                weight = weight['weight']
-                try:
-                    weight = weight if weight == NFA.__epsilon else eval(weight)
-                except TypeError:
-                    weight = str(chr(weight))
-
-                for input in inputs:
-                    if weight == str(input):
-                        destination.add(to_node)
-
-        destination.update(self.get_epsilon_closures(destination))
-        return destination
+    # def move(self, nodes, input):
+        # """
+        # moves through the NFA starting from nodes under some input
+        # and returns the destination
+        # """
+        # destination = set()
+        #
+        # nodes = {nodes} if not isinstance(nodes, set) else nodes
+        # nodes.update(self.get_epsilon_closures(nodes))
+        # inputs = {input} if not isinstance(input, set) else input
+        #
+        # for node in nodes:
+        #     for edge in self.graph.edges_iter(node, True):
+        #         from_node, to_node, weight = edge
+        #         weight = weight['weight']
+        #         try:
+        #             weight = weight if weight == NFA.epsilon else eval(weight)
+        #         except TypeError:
+        #             weight = str(chr(weight))
+        #
+        #         for input in inputs:
+        #             if weight == str(input):
+        #                 destination.add(to_node)
+        #
+        # destination.update(self.get_epsilon_closures(destination))
+        # return destination
 
     def check_acceptance(self, nodes):
         '''
