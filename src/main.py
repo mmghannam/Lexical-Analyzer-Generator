@@ -1,20 +1,8 @@
-from src.dfa import *
-from src.grammar import Grammar
-from src.grammar_token import GrammarToken
-from src.nfa import *
+from src.pylex import Pylex
 
-tokens = [
-    GrammarToken('bibo', '(0|1)*0')
-]
-nfa = NFA.from_tokens(tokens)
+pylex = Pylex()
 
-# g = Grammar(path='./grammar.txt')
-# nfa = NFA.from_grammar(g)
-
-print('start: ', nfa.start_node)
-print('end: ', nfa.end_node)
-
-nfa.draw()
-
-dfa = DFA(nfa)
-dfa.read_token_stream('test.txt')
+pylex.read_grammar(path='./grammar.txt')
+pylex.generate_nfa()
+pylex.generate_dfa()
+pylex.read_source_code(path='test.txt')

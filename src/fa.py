@@ -42,9 +42,6 @@ class FA:
                     weight = chr(weight)
                 except (NameError, SyntaxError):
                     pass
-                # except SyntaxError:
-                #     print(weight)
-                #     weight = chr(weight)
 
                 for input in inputs:
                     if str(weight) == str(input):
@@ -80,8 +77,7 @@ class FA:
 
         node_neighbors = self.graph.neighbors(node)
         for neighbor in node_neighbors:
-            edge = self.graph.get_edge_data(node, neighbor)
-            weight = edge[0]['weight']
+            weight = self.graph.get_edge_data(node, neighbor)[0]['weight']
 
             if weight == FA.epsilon:
                 epsilon_closure.add(neighbor)
@@ -108,6 +104,11 @@ class FA:
         return self.get_epsilon_closures(nodes)
 
     def state_exists(self, new_state):
+        """
+        Searches if the new state exists already in the FA
+
+        :return: True if state already exists, False otherwise
+        """
         for state in self.states:
             if new_state.NFAStates == state.NFAStates:
                 return True, state.index
@@ -117,6 +118,8 @@ class FA:
     def draw(self):
         """
         Implements the drawing algorithm for the FA
+
+        To be implemented in each child class
         """
         raise NotImplementedError
 
@@ -151,6 +154,11 @@ class FA:
             json.dump(object, f, indent=4)
 
     def __copy__(self, fa):
+        """
+        Copies FA attributes from another FA instance
+        """
+        assert isinstance(fa, FA)
+
         self.node_index = fa.node_index
         self.start_node = fa.start_node
         self.states = fa.states

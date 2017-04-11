@@ -18,10 +18,8 @@ class DFA(FA):
         self.transition_table = {}
         self.init_input_list()
 
-        dfa = self.generate_dfa(nfa, minimize=True)
-        print('states count: ', len(dfa.states))
+        dfa = self.generate_dfa(nfa, minimize=False)
         self.__copy__(dfa)
-        print('states count 2: ', len(self.states))
 
         # after DFA stuff
         self.accepted_tokens = []
@@ -29,6 +27,13 @@ class DFA(FA):
 
     # DFA graph
     def generate_dfa(self, nfa, minimize=False):
+        """
+        Applies the Subset Construction Algorithm to generate a DFA
+            for a corresponding NFA
+
+        If minimize is set to True, then the minimization algorithm
+            will be used to reduced the resulting DFA
+        """
         new_dfa = FA()
 
         start_state = DFAState(new_dfa.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False, None)
@@ -63,31 +68,29 @@ class DFA(FA):
 
         if minimize:
             new_dfa = self.minimize(new_dfa)
-            self.generate_transition_table(new_dfa)
+
+        self.generate_transition_table(new_dfa)
 
         return new_dfa
 
     # Minimization Functions
     def minimize(self, fa):
         """
-        returns a copy of the graph but minimized
-
-        :param graph:
-        :return:
+        Applies Brzozowski's minimization Algorithm
         """
         R1 = self.reverse(fa)
         R1.start_node = self.get_start_node(R1.graph)
-        self.draw(R1.graph)
+        # self.draw(R1.graph)
 
         D1 = self.generate_dfa(R1)
-        self.draw(D1.graph)
+        # self.draw(D1.graph)
 
         R2 = self.reverse(D1)
         R2.start_node = self.get_start_node(R2.graph)
-        self.draw(R2.graph)
+        # self.draw(R2.graph)
 
         D2 = self.generate_dfa(R2)
-        self.draw(D2.graph)
+        # self.draw(D2.graph)
 
         return D2
 
@@ -99,8 +102,8 @@ class DFA(FA):
 
         Doesn't change the original graph
         """
-        # graph = self.add_last_node(fa, copy)
-        graph = fa.graph.copy() if copy else fa.graph
+        graph = self.add_last_node(fa, copy)
+        # graph = fa.graph.copy() if copy else fa.graph
 
         if copy:
             from copy import deepcopy
@@ -124,6 +127,10 @@ class DFA(FA):
             return fa
 
     def add_last_node(self, fa, copy=True):
+        """
+        Adds a node after all accepting nodes, to help in
+            reversing algorithm
+        """
         graph = fa.graph.copy() if copy else fa.graph
 
         last = DFAState(fa.get_node_index(), {}, True, None)
@@ -137,23 +144,23 @@ class DFA(FA):
         return graph
 
     def get_start_node(self, graph):
+        """
+        Use BFS to find the starting node of an NFA
+        """
         all_keys, all_values = set(), set()
 
         for x in graph.nodes():
             l = bfs_predecessors(graph, x)
-            print(l)
             all_keys.update(l.keys())
             all_values.update(l.values())
 
-        print(all_keys)
-        print(all_values)
-
-        print(all_values - all_keys)
-
-        return all_values
+        return int(list(all_values - all_keys)[0])
 
     # Transition Table
     def generate_transition_table(self, fa=None):
+        """
+        Generates a transition table from a given graph
+        """
         G = self.graph if fa is None else fa.graph
 
         for node in G.nodes_iter():
@@ -162,18 +169,15 @@ class DFA(FA):
             for u, v, d in G.out_edges(node, data=True):
                 self.transition_table[node][d['weight']] = v
 
-        self.print_transition_table(fa)
-        FA.dump(self.transition_table, 'table.pic')
-        FA.dump_json(self.transition_table, 'table.json')
+                # self.print_transition_table(fa)
+                # FA.dump(self.transition_table, 'table.pic')
+                # FA.dump_json(self.transition_table, 'table.json')
 
     def load_table(self):
         import pickle
 
         with open('table.pic', 'rb') as t:
             self.transition_table = pickle.load(t)
-
-            # with open('dfa_graph.pic', 'wb') as g:
-            #     self.graph = pickle.load(g)
 
     def print_transition_table(self, fa=None):
         states = self.states if fa is None else fa.states
@@ -190,9 +194,9 @@ class DFA(FA):
 
     # Utilities
     def init_input_list(self):
-        '''
+        """
         initiate list with all possible input symbols
-        '''
+        """
         letters = list(string.ascii_letters)
         digits = list(string.digits)
         operators = ['!', '>', '<',  # relational operators ('==', '!=', '>', '>=', '<', '<=')
@@ -202,8 +206,8 @@ class DFA(FA):
                      ';', ',', '(', ')', '{', '}'  # reserved operators
                      ]
 
-        # self.input_list = letters + digits + operators
-        self.input_list = '01'
+        self.input_list = letters + digits + operators
+        # self.input_list = '01'
 
     def draw(self, graph=None):
         G = self.graph if graph is None else graph
@@ -212,7 +216,7 @@ class DFA(FA):
             d['label'] = d.get('weight', '')
 
         g = networkx.drawing.nx_agraph.to_agraph(G)
-        g.layout('dot')
+        g.layout()
         g.draw('DFA.png')
 
         import matplotlib.image as mpimg
@@ -232,14 +236,14 @@ class DFA(FA):
         return self.transition_table[node_index][input]
 
     def read_token_stream(self, filename):
-        '''
+        """
         reads token stream from a file and runs each token
         through the DFA.
 
         writes tokens to output file
 
         :param filename: name of file to be read
-        '''
+        """
         tokens = Reader(filename).getTokens()
 
         for token in tokens:
@@ -251,13 +255,16 @@ class DFA(FA):
 
         f.close()
 
+        FA.dump(self.symbol_table, 'symbol_table.pic')
+        FA.dump_json(self.symbol_table, 'symbol_table.json')
+
     def accept_token(self, token):
-        '''
+        """
         Runs a token through the DFA
         If it passes, it is added to the list
 
         :param token: a single token to test
-        '''
+        """
         current_state_index = 0  # start node
         for char in token:
             current_state_index = self.move(current_state_index, char)
