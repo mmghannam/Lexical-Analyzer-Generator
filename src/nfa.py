@@ -1,16 +1,16 @@
-import matplotlib.pyplot as plt
+from networkx import *
 
-from src.fa import *
+from src.fa import FA
 from src.helpers import *
 
 
 class NFA(FA):
+    # current node index is kept as a static variable to ensure that
+    # no two node are given the same index
+    __cni = 1
+
     def __init__(self):
         super().__init__()
-
-        # TODO: use MultiDiGraph()
-        self.graph = DiGraph()
-        self.start_node = None
         self.end_node = None
 
     @staticmethod
@@ -123,6 +123,15 @@ class NFA(FA):
             operands.push(operands.pop().plus())
 
     @staticmethod
+    def get_node_index():
+        """
+        This method keeps track of the index of nodes and returns a different index each time by incrementing the static
+        class variable __cni
+        """
+        NFA.__cni += 1
+        return NFA.__cni - 1
+
+    @staticmethod
     def from_simple_regex(regex):
         """
         This method creates an NFA from a simple regex containing either characters or ranges
@@ -155,34 +164,28 @@ class NFA(FA):
         else:
             self.concatenate_node(regex)
         if not self.end_node:
-            self.end_node = self.get_node_index() - 1
+            self.end_node = NFA.__cni - 1
         return self
 
     def concatenate_node(self, edge_weight):
         if not self.start_node and not self.end_node:
-            self.start_node = self.get_node_index()
-            self.increment_node_index()
-            self.end_node = self.get_node_index()
-            self.increment_node_index()
+            self.start_node = NFA.get_node_index()
+            self.end_node = NFA.get_node_index()
             self.graph.add_weighted_edges_from([(self.start_node, self.end_node, repr(edge_weight))])
 
     def add_nodes_in_range(self, start_char, end_char):
         # create start node
         self.start_node = self.get_node_index()
-        self.increment_node_index()
         # create end_node
         self.end_node = self.get_node_index()
-        self.increment_node_index()
 
         for char_ord in range(ord(start_char), ord(end_char) + 1):
             # connect starting node to first node before character
             self.graph.add_weighted_edges_from([(self.start_node, self.get_node_index(), NFA.epsilon)])
-            self.increment_node_index()
             # connect first node before character to the node after character
-            self.graph.add_weighted_edges_from([(self.get_node_index(), self.get_node_index(), char_ord)])
-            self.increment_node_index()
+            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.get_node_index(), char_ord)])
             # connect node after character with end node
-            self.graph.add_weighted_edges_from([(self.get_node_index(), self.end_node, NFA.epsilon)])
+            self.graph.add_weighted_edges_from([(NFA.__cni - 1, self.end_node, NFA.epsilon)])
 
     def concatenate(self, nfa):
         if self.start_node and self.end_node:
@@ -206,9 +209,7 @@ class NFA(FA):
 
         # create new start and end nodes
         self.start_node = self.get_node_index()
-        self.increment_node_index()
         self.end_node = self.get_node_index()
-        self.increment_node_index()
 
         # connect new start to both starts of the two graphs
         self.graph.add_weighted_edges_from([(self.start_node, last_start_node, NFA.epsilon)])
@@ -235,9 +236,7 @@ class NFA(FA):
 
         # create new start and end nodes
         self.start_node = self.get_node_index()
-        self.increment_node_index()
         self.end_node = self.get_node_index()
-        self.increment_node_index()
 
         # add epsilon transition from new start node to new end node,
         # and add epsilon transition from new start node to new end node
@@ -263,10 +262,8 @@ class NFA(FA):
         nfa = NFA()
 
         # create start and end nodes
-        nfa.start_node = nfa.get_node_index()
-        nfa.increment_node_index()
-        nfa.end_node = nfa.get_node_index()
-        nfa.increment_node_index()
+        nfa.start_node = NFA.get_node_index()
+        nfa.end_node = NFA.get_node_index()
 
         # connect start and end node with an epsilon
         nfa.graph.add_weighted_edges_from([(nfa.start_node, nfa.end_node, NFA.epsilon)])
@@ -282,7 +279,7 @@ class NFA(FA):
         try:
             self.graph.node[node_index]['acceptance']
             return True
-        except AttributeError:
+        except:
             return False
 
     def get_token_name_from_acceptance_node(self, node_index):
@@ -305,6 +302,7 @@ class NFA(FA):
         g.draw('NFA.png')
 
         import matplotlib.image as mpimg
+        import matplotlib.pyplot as plt
 
         img = mpimg.imread('NFA.png')
         plt.figure()

@@ -11,6 +11,7 @@ class FA:
 
     def __init__(self):
         self.node_index = 0
+        self.start_node = None
         self.states = []
         self.graph = MultiDiGraph()
 
@@ -33,16 +34,22 @@ class FA:
             for edge in self.graph.edges_iter(node, True):
                 from_node, to_node, weight = edge
                 weight = weight['weight']
+
+                # TODO: the following needs better (scientific) implementation
                 try:
                     weight = weight if weight == FA.epsilon else eval(weight)
                 except TypeError:
-                    weight = str(chr(weight))
+                    weight = chr(weight)
+                except (NameError, SyntaxError):
+                    pass
+                # except SyntaxError:
+                #     print(weight)
+                #     weight = chr(weight)
 
                 for input in inputs:
-                    if weight == str(input):
+                    if str(weight) == str(input):
                         destination.add(to_node)
 
-        destination.update(self.get_epsilon_closures(destination))
         return destination
 
     def get_node_index(self):
@@ -74,7 +81,7 @@ class FA:
         node_neighbors = self.graph.neighbors(node)
         for neighbor in node_neighbors:
             edge = self.graph.get_edge_data(node, neighbor)
-            weight = edge['weight']
+            weight = edge[0]['weight']
 
             if weight == FA.epsilon:
                 epsilon_closure.add(neighbor)
@@ -100,13 +107,21 @@ class FA:
         nodes.update(epsilon_closures)
         return self.get_epsilon_closures(nodes)
 
+    def state_exists(self, new_state):
+        for state in self.states:
+            if new_state.NFAStates == state.NFAStates:
+                return True, state.index
+
+        return False, new_state.index
+
     def draw(self):
         """
         Implements the drawing algorithm for the FA
         """
         raise NotImplementedError
 
-    def dump(self, object, filename):
+    @staticmethod
+    def dump(object, filename):
         """
         dumps a serialized version of any object inside the class
 
@@ -120,7 +135,8 @@ class FA:
         with open(filename, 'wb') as f:
             pickle.dump(object, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def dump_json(self, object, filename):
+    @staticmethod
+    def dump_json(object, filename):
         """
         dumps a json representation of any object inside the class
 
@@ -133,3 +149,9 @@ class FA:
 
         with open(filename, 'w') as f:
             json.dump(object, f, indent=4)
+
+    def __copy__(self, fa):
+        self.node_index = fa.node_index
+        self.start_node = fa.start_node
+        self.states = fa.states
+        self.graph = fa.graph

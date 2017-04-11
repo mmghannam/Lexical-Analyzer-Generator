@@ -6,6 +6,7 @@ from networkx import *
 from prettytable import PrettyTable
 
 from src.fa import *
+from src.nfa import *
 from .reader import Reader
 
 DFAState = namedtuple('DFAState', ['index', 'NFAStates', 'acceptance', 'token'])
@@ -15,23 +16,19 @@ class DFA(FA):
     def __init__(self, nfa):
         super().__init__()
         self.transition_table = {}
-
         self.init_input_list()
-        dfa = self.generate_dfa(nfa)
 
-        self.graph = dfa.graph
-        self.node_index = dfa.node_index
-        self.states = dfa.states
+        dfa = self.generate_dfa(nfa, minimize=True)
+        print('states count: ', len(dfa.states))
+        self.__copy__(dfa)
+        print('states count 2: ', len(self.states))
 
         # after DFA stuff
         self.accepted_tokens = []
         self.symbol_table = {}
-        # self.read_token_stream(filename)
 
     # DFA graph
-    def generate_dfa(self, nfa):
-        assert isinstance(nfa, FA)
-
+    def generate_dfa(self, nfa, minimize=False):
         new_dfa = FA()
 
         start_state = DFAState(new_dfa.get_node_index(), nfa.get_epsilon_closures(nfa.start_node), False, None)
@@ -48,15 +45,10 @@ class DFA(FA):
                 # get new state by moving under input
                 new_nfa_states = nfa.get_epsilon_closures(nfa.move(current_state.NFAStates, input_literal))
 
-                # not going anywhere
-                # TODO: handle rejection state
-                # if not new_nfa_states:  # rejection
-                #     continue
-
                 is_acceptance, token = nfa.check_acceptance(new_nfa_states)
                 new_dfa_state = DFAState(new_dfa.get_node_index(), new_nfa_states, is_acceptance, token)
                 # check if state already exists
-                state_exists, index = self.state_exists(new_dfa_state)
+                state_exists, index = new_dfa.state_exists(new_dfa_state)
 
                 if not state_exists:  # new state
                     new_dfa.states.append(new_dfa_state)
@@ -67,37 +59,39 @@ class DFA(FA):
                 else:  # already exists, don't add to worklist
                     new_dfa.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        self.draw(new_dfa)
-        self.minimize(self.graph)
-        # self.generate_transition_table()
+        self.draw(new_dfa.graph)
+
+        if minimize:
+            new_dfa = self.minimize(new_dfa)
+            self.generate_transition_table(new_dfa)
 
         return new_dfa
 
     # Minimization Functions
-    def minimize(self, graph):
+    def minimize(self, fa):
         """
         returns a copy of the graph but minimized
 
         :param graph:
         :return:
         """
-        R1 = self.reverse(graph)
-        self.draw(R1)
-
-        print(self.get_start_node(R1))
+        R1 = self.reverse(fa)
+        R1.start_node = self.get_start_node(R1.graph)
+        self.draw(R1.graph)
 
         D1 = self.generate_dfa(R1)
-        self.draw(D1)
+        self.draw(D1.graph)
 
-        R2 = self.reverse(D1.graph)
-        self.draw(R2)
+        R2 = self.reverse(D1)
+        R2.start_node = self.get_start_node(R2.graph)
+        self.draw(R2.graph)
 
         D2 = self.generate_dfa(R2)
-        self.draw()
+        self.draw(D2.graph)
 
-        plt.show()
+        return D2
 
-    def reverse(self, graph, copy=True):
+    def reverse(self, fa, copy=True):
         """Return the reverse of the graph.
 
         The reverse is a graph with the same nodes and edges
@@ -105,8 +99,8 @@ class DFA(FA):
 
         Doesn't change the original graph
         """
-        graph = self.add_last_node(graph, copy)
-        self.draw(graph)
+        # graph = self.add_last_node(fa, copy)
+        graph = fa.graph.copy() if copy else fa.graph
 
         if copy:
             from copy import deepcopy
@@ -117,22 +111,27 @@ class DFA(FA):
                              in graph.edges(keys=True, data=True))
             R.graph = deepcopy(graph.graph)
             R.node = deepcopy(graph.node)
+            new_fa = NFA()
+            new_fa.__copy__(fa)
+            new_fa.graph = R
+            return new_fa
+
         else:
             graph.pred, graph.succ = graph.succ, graph.pred
             graph.adj = graph.succ
             R = graph
+            fa.graph = R
+            return fa
 
-        return R
+    def add_last_node(self, fa, copy=True):
+        graph = fa.graph.copy() if copy else fa.graph
 
-    def add_last_node(self, original_graph, copy=True):
-        graph = original_graph.copy() if copy else original_graph
-
-        last = DFAState(self.get_node_index(), {}, True, None)
+        last = DFAState(fa.get_node_index(), {}, True, None)
 
         for node in graph.copy().nodes_iter():
-            if self.states[node].acceptance:
-                self.states[node] = DFAState(self.states[node].index, self.states[node].NFAStates, False,
-                                             self.states[node].token)
+            if fa.states[node].acceptance:
+                fa.states[node] = DFAState(fa.states[node].index, fa.states[node].NFAStates, False,
+                                           fa.states[node].token)
                 graph.add_weighted_edges_from([(node, last.index, DFA.epsilon)])
 
         return graph
@@ -142,14 +141,20 @@ class DFA(FA):
 
         for x in graph.nodes():
             l = bfs_predecessors(graph, x)
+            print(l)
             all_keys.update(l.keys())
             all_values.update(l.values())
 
-        return int(list((all_values - all_keys))[0])
+        print(all_keys)
+        print(all_values)
+
+        print(all_values - all_keys)
+
+        return all_values
 
     # Transition Table
-    def generate_transition_table(self, graph=None):
-        G = self.graph if graph is None else graph
+    def generate_transition_table(self, fa=None):
+        G = self.graph if fa is None else fa.graph
 
         for node in G.nodes_iter():
             self.transition_table[node] = OrderedDict()
@@ -157,24 +162,9 @@ class DFA(FA):
             for u, v, d in G.out_edges(node, data=True):
                 self.transition_table[node][d['weight']] = v
 
-        self.dump_table()
-        # self.print_transition_table()
-        # self.export_table_as_json()
-
-    def export_table_as_json(self):
-        import json
-
-        with open('table.json', 'w') as f:
-            json.dump(self.transition_table, f, indent=4)
-
-    def dump_table(self):
-        import pickle
-
-        with open('table.pic', 'wb') as t:
-            pickle.dump(self.transition_table, t, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # with open('dfa_graph.pic', 'wb') as g:
-            #     pickle.dump(self.graph, g, protocol=pickle.HIGHEST_PROTOCOL)
+        self.print_transition_table(fa)
+        FA.dump(self.transition_table, 'table.pic')
+        FA.dump_json(self.transition_table, 'table.json')
 
     def load_table(self):
         import pickle
@@ -185,35 +175,20 @@ class DFA(FA):
             # with open('dfa_graph.pic', 'wb') as g:
             #     self.graph = pickle.load(g)
 
-    def print_transition_table(self):
+    def print_transition_table(self, fa=None):
+        states = self.states if fa is None else fa.states
         print('=' * 100)
-
         table = PrettyTable(['State'] + [x for x in self.input_list])
 
         for index in self.transition_table:
             row = self.transition_table[index]
-
-            state = str(index) + ': ' + (str(self.states[index].NFAStates)) \
-                if self.states[index].NFAStates else 'Rejection'
-
+            state = str(index) + ': ' + (str(states[index].NFAStates)) \
+                if states[index].NFAStates else 'Rejection'
             table.add_row([state] + [row[x] for x in row])
 
         print(table)
 
     # Utilities
-    def state_exists(self, new_state):
-        for state in self.states:
-            if new_state.NFAStates == state.NFAStates:
-                return True, state.index
-
-        return False, new_state.index
-
-    # def get_node_index(self):
-    #     return self.node_index
-
-    # def increment_node_index(self):
-    #     self.node_index += 1
-
     def init_input_list(self):
         '''
         initiate list with all possible input symbols
@@ -237,7 +212,7 @@ class DFA(FA):
             d['label'] = d.get('weight', '')
 
         g = networkx.drawing.nx_agraph.to_agraph(G)
-        g.layout()
+        g.layout('dot')
         g.draw('DFA.png')
 
         import matplotlib.image as mpimg
@@ -245,7 +220,7 @@ class DFA(FA):
         img = mpimg.imread('DFA.png')
         plt.figure()
         plt.imshow(img)
-        plt.show(block=False)
+        plt.show()
 
     # Source Code File Functions
     def move(self, node_index, input):
