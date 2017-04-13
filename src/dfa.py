@@ -18,6 +18,7 @@ class DFA(FA):
         self.transition_table = {}
         self.init_input_list()
 
+        self.rejection_state = None
         dfa = self.generate_dfa(nfa, minimize=False)
         self.__copy__(dfa)
 
@@ -59,12 +60,15 @@ class DFA(FA):
                     new_dfa.states.append(new_dfa_state)
                     worklist.append(new_dfa_state)
 
+                    if not new_nfa_states:
+                        self.rejection_state = new_dfa_state
+
                     new_dfa.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
                     new_dfa.increment_node_index()
                 else:  # already exists, don't add to worklist
                     new_dfa.graph.add_weighted_edges_from([(current_state.index, index, input_literal)])
 
-        self.draw(new_dfa.graph)
+        # self.draw(new_dfa.graph)
 
         if minimize:
             new_dfa = self.minimize(new_dfa)
@@ -233,7 +237,12 @@ class DFA(FA):
         :param input: input literal
         :return: new node index
         '''
-        return self.transition_table[node_index][input]
+        try:
+            target = self.transition_table[node_index][input]
+        except KeyError:
+            target = self.rejection_state.index
+
+        return target
 
     def read_token_stream(self, filename):
         """
@@ -247,7 +256,17 @@ class DFA(FA):
         tokens = Reader(filename).getTokens()
 
         for token in tokens:
-            self.accept_token(token)
+            if not self.accept_token(token):
+                print('Lexical Error in', token)
+                token = token[:-1]
+                print('--->>> Recovering...')
+                while not self.accept_token(token) and token:
+                    print('\ttried:', token)
+                    token = token[:-1]
+                if token:
+                    print('accepted as :', token)
+                else:
+                    print('Recovery failed.')
 
         f = open('output.txt', 'w')
         for accepted_token in self.accepted_tokens:
@@ -275,3 +294,9 @@ class DFA(FA):
 
             if current_state.token == 'id':
                 self.symbol_table[token] = {}
+            return True
+        else:
+            return False
+
+
+
