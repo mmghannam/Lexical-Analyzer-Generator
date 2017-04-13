@@ -9,6 +9,7 @@ class Reader:
         file = open(self.filename)
         content = file.read()
 
+        # TODO: if input '> =', tree bank will ignore spaces
         tokens = tokenize.TreebankWordTokenizer().tokenize(content)
 
         relops = ['!=', '>=', '<=']
