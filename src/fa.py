@@ -64,6 +64,17 @@ class FA:
         """
         self.node_index += 1
 
+    def __memoize_epsilon(f):
+        memo = {}
+
+        def helper(fa, x):
+            if x not in memo:
+                memo[x] = f(fa, x)
+            return memo[x]
+
+        return helper
+
+    @__memoize_epsilon
     def __epsilon_closure(self, node):
         """
         calculates the epsilon closures of a given state.
