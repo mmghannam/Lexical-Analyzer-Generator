@@ -22,10 +22,16 @@ class Pylex:
 
         print('start: ', self.nfa.start_node, ', end: ', self.nfa.end_node)
 
-        self.nfa.draw()
+        # self.nfa.draw()
 
     def generate_dfa(self):
-        self.dfa = DFA(self.nfa)
+        if self.nfa:
+            self.dfa = DFA(self.nfa)
+        else:
+            raise ValueError('NFA was not generated.')
 
     def read_source_code(self, path):
-        self.dfa.read_token_stream(path)
+        if self.dfa:
+            self.dfa.read_token_stream(path)
+        else:
+            raise ValueError('DFA was not generated.')
